@@ -67,6 +67,7 @@ if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
 
+    # Risk level interpretation
     if probability < 0.3:
         risk_level = "✅ Low Risk"
     elif probability < 0.7:
@@ -77,22 +78,25 @@ if st.button("Predict Risk"):
     st.subheader(f"Prediction: {risk_level}")
     st.write(f"**Probability of High Risk:** {probability:.2%}")
 
-    # SHAP explanation
-    st.subheader("🔍 Feature Contribution (SHAP Explanation)")
+    # === SHAP explanation ===
+    st.subheader("🔍 Top Factors Influencing This Prediction")
+
+    # Create SHAP explainer
     explainer = shap.Explainer(model, input_df)
     shap_values = explainer(input_df)
 
-    # Text-based top features
-    shap_series = pd.Series(shap_values[0].values, index=input_df.columns)
-    shap_series = shap_series.sort_values(key=abs, ascending=False)
+    # Fix for single-row SHAP output
+    shap_array = shap_values.values[0] if hasattr(shap_values, "values") else shap_values[0].values
+    shap_series = pd.Series(shap_array, index=input_df.columns)
+    shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-    st.markdown("### Top Factors Influencing This Prediction:")
+    # Show top 5 features in simple language
     for feature, value in shap_series.head(5).items():
         direction = "increased" if value > 0 else "decreased"
         emoji = "🔺" if value > 0 else "🔻"
         st.write(f"{emoji} **{feature}** — {direction} the risk")
 
-    # Bar chart
+    # Optional: SHAP bar chart
     fig, ax = plt.subplots(figsize=(10, 5))
     shap.plots.bar(shap_values[0], show=False)
     st.pyplot(fig)
