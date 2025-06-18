@@ -36,22 +36,19 @@ bp = st.selectbox("Blood Pressure", [
 urine_albumin = st.selectbox("Urine Albumin", ["None", "Minimal", "Medium"])
 
 # === Prepare Input DataFrame ===
-# Initialize DataFrame with zeros and correct column names & order
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 
-# Set numeric values
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
 input_df.at[0, 'Height'] = height
 input_df.at[0, 'GestationalAge'] = gest_age
 input_df.at[0, 'FetalHeartbeat'] = fhr
 
-# Helper function
 def set_if_exists(df, col):
     if col in df.columns:
         df.at[0, col] = 1
 
-# Set checkboxes and dropdowns
+# Set categorical/checks
 if anemia_min: set_if_exists(input_df, 'Anemia_Minimal')
 if urine_sugar: set_if_exists(input_df, 'UrineSugar_Yes')
 if jaundice_min: set_if_exists(input_df, 'Jaundice_Minimal')
@@ -70,7 +67,6 @@ if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
 
-    # Risk level interpretation
     if probability < 0.3:
         risk_level = "✅ Low Risk"
     elif probability < 0.7:
@@ -86,8 +82,17 @@ if st.button("Predict Risk"):
     explainer = shap.Explainer(model, input_df)
     shap_values = explainer(input_df)
 
-    # st.set_option('deprecation.showPyplotGlobalUse', False)
+    # Text-based top features
+    shap_series = pd.Series(shap_values[0].values, index=input_df.columns)
+    shap_series = shap_series.sort_values(key=abs, ascending=False)
+
+    st.markdown("### Top Factors Influencing This Prediction:")
+    for feature, value in shap_series.head(5).items():
+        direction = "increased" if value > 0 else "decreased"
+        emoji = "🔺" if value > 0 else "🔻"
+        st.write(f"{emoji} **{feature}** — {direction} the risk")
+
+    # Bar chart
     fig, ax = plt.subplots(figsize=(10, 5))
     shap.plots.bar(shap_values[0], show=False)
     st.pyplot(fig)
-
