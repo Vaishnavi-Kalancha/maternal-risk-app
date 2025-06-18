@@ -86,7 +86,7 @@ if st.button("Predict Risk"):
     explainer = shap.Explainer(model, input_df)
     shap_values = explainer(input_df)
 
-    st.set_option('deprecation.showPyplotGlobalUse', False)
+    # st.set_option('deprecation.showPyplotGlobalUse', False)
     plt.figure(figsize=(10, 5))
     shap.plots.bar(shap_values[0], show=False)
     st.pyplot()
