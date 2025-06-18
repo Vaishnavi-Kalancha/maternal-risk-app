@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import shap
+import joblib
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import (
@@ -126,6 +127,8 @@ plt.tight_layout()
 plt.savefig("shap_bar_plot.png", dpi=300)  # Saves the plot
 plt.show()
 # === Save the trained model for the Streamlit/Flask app ===
-import joblib
+
 joblib.dump(model, "model.pkl")
-print("✅ Model saved as model.pkl")
+joblib.dump(list(X.columns), "feature_order.pkl")
+print("✅ Model and feature order saved.")
+
