@@ -36,7 +36,8 @@ bp = st.selectbox("Blood Pressure", [
 urine_albumin = st.selectbox("Urine Albumin", ["None", "Minimal", "Medium"])
 
 # === Prepare Input DataFrame ===
-input_df = pd.DataFrame(data=np.zeros((1, len(feature_order))), columns=feature_order)
+# Initialize DataFrame with zeros and correct column names & order
+input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 
 # Set numeric values
 input_df.at[0, 'Age'] = age
@@ -50,7 +51,7 @@ def set_if_exists(df, col):
     if col in df.columns:
         df.at[0, col] = 1
 
-# Set inputs
+# Set checkboxes and dropdowns
 if anemia_min: set_if_exists(input_df, 'Anemia_Minimal')
 if urine_sugar: set_if_exists(input_df, 'UrineSugar_Yes')
 if jaundice_min: set_if_exists(input_df, 'Jaundice_Minimal')
@@ -64,19 +65,12 @@ set_if_exists(input_df, f'BloodPressure_{bp}')
 if urine_albumin != "None":
     set_if_exists(input_df, f'UrineAlbumin_{urine_albumin}')
 
-# Fill missing columns (if any)
-for col in feature_order:
-    if col not in input_df.columns:
-        input_df[col] = 0
-
-# Ensure correct order
-input_df = input_df[feature_order]
-
 # === Predict and Explain ===
 if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
 
+    # Risk level interpretation
     if probability < 0.3:
         risk_level = "✅ Low Risk"
     elif probability < 0.7:
@@ -92,6 +86,7 @@ if st.button("Predict Risk"):
     explainer = shap.Explainer(model, input_df)
     shap_values = explainer(input_df)
 
-    fig, ax = plt.subplots()
+    st.set_option('deprecation.showPyplotGlobalUse', False)
+    plt.figure(figsize=(10, 5))
     shap.plots.bar(shap_values[0], show=False)
-    st.pyplot(fig)
+    st.pyplot()
