@@ -83,7 +83,11 @@ if st.button("Predict Risk"):
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        shap_array = shap_values[0].values if hasattr(shap_values[0], "values") else shap_values.values[0]
+        # Fix for 2D SHAP value outputs (ensures proper shape)
+        shap_array = shap_values.values[0]
+        if shap_array.ndim == 2:
+            shap_array = shap_array[:, 1]  # Select 2nd column if it's multiclass or 2D
+
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
         top_factors = shap_series[shap_series.abs() > 0.001].head(5)
@@ -97,5 +101,6 @@ if st.button("Predict Risk"):
             st.info("No major features significantly influenced this prediction.")
 
     except Exception as e:
-        st.warning("Could not generate explanation.")
-        st.text(str(e))
+        st.warning("❌ Could not generate explanation.")
+        st.caption(f"Error: {str(e)}")
+
