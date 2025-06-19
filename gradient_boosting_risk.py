@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import shap
 import joblib
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingClassifier  # You can switch to HistGradientBoostingClassifier
 from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
     roc_curve, auc, RocCurveDisplay
@@ -51,7 +51,11 @@ df['HighRisk'] = df['HighRisk'].map({'Yes': 1, 'No': 0})
 # Drop rows with missing target
 df = df.dropna(subset=['HighRisk'])
 
-# One-hot encoding for categorical features
+# 🔍 Class balance check
+print("\n=== Class Distribution ===")
+print(df['HighRisk'].value_counts())
+
+# One-hot encoding
 categorical_cols = [
     'Gravida', 'TetanusDose', 'BloodPressure', 'Anemia', 'Jaundice',
     'FetalPosition', 'FetalMovement', 'UrineAlbumin', 'UrineSugar',
@@ -59,22 +63,23 @@ categorical_cols = [
 ]
 df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
 
-# Drop identifier column and rows with NaNs
+# Drop name column and any remaining NaNs
 df = df.drop(columns=['Name'], errors='ignore')
 df = df.dropna()
 
-# === Split features and target ===
+# === Train/test split ===
 X = df.drop(columns=['HighRisk'])
 y = df['HighRisk']
 
-# === 70-30 train-test split ===
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, stratify=y, random_state=42
+)
 
-# === Train Gradient Boosting model ===
+# === Model training ===
 model = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
 model.fit(X_train, y_train)
 
-# === Evaluate ===
+# === Evaluation ===
 preds = model.predict(X_test)
 y_probs = model.predict_proba(X_test)[:, 1]
 
@@ -94,7 +99,7 @@ RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=roc_auc).plot()
 plt.title(f"ROC Curve (AUC = {roc_auc:.2f})")
 plt.show()
 
-# === Cross-validation (F1 and Accuracy) ===
+# === Cross-validation ===
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 f1_scores = cross_val_score(model, X, y, cv=skf, scoring='f1_macro')
 acc_scores = cross_val_score(model, X, y, cv=skf, scoring='accuracy')
@@ -103,31 +108,27 @@ print("\n=== Cross-Validation ===")
 print("F1 Macro Mean:", np.mean(f1_scores))
 print("Accuracy Mean:", np.mean(acc_scores))
 
+# === SHAP Explainability ===
 print("\n=== SHAP Explainability ===")
-
-# Convert to float64 (ensures SHAP compatibility)
 X_shap = X_train.astype(np.float64)
 X_test_shap = X_test.astype(np.float64)
 
-# Create SHAP explainer
 explainer = shap.Explainer(model, X_shap)
 shap_values = explainer(X_test_shap)
 
-# 📈 Bigger and clearer summary plot
 plt.figure(figsize=(12, 6))
 shap.summary_plot(shap_values, X_test_shap, show=False)
 plt.tight_layout()
-plt.savefig("shap_summary_plot.png", dpi=300)  # Saves the plot
+plt.savefig("shap_summary_plot.png", dpi=300)
 plt.show()
 
-# 📊 Optional: Feature importance bar plot
 plt.figure(figsize=(10, 5))
 shap.plots.bar(shap_values, show=False)
 plt.tight_layout()
-plt.savefig("shap_bar_plot.png", dpi=300)  # Saves the plot
+plt.savefig("shap_bar_plot.png", dpi=300)
 plt.show()
-# === Save the trained model for the Streamlit/Flask app ===
 
+# === Save model and feature order for Streamlit ===
 joblib.dump(model, "model.pkl")
 joblib.dump(list(X.columns), "feature_order.pkl")
 print("✅ Model and feature order saved.")
