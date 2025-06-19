@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import joblib
 import shap
-import matplotlib.pyplot as plt
 
 # === Load model and feature order ===
 model = joblib.load("model.pkl")
@@ -37,7 +36,6 @@ urine_albumin = st.selectbox("Urine Albumin", ["None", "Minimal", "Medium"])
 
 # === Prepare Input DataFrame ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
-
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
 input_df.at[0, 'Height'] = height
@@ -48,7 +46,7 @@ def set_if_exists(df, col):
     if col in df.columns:
         df.at[0, col] = 1
 
-# Set categorical/checks
+# Set binary and categorical features
 if anemia_min: set_if_exists(input_df, 'Anemia_Minimal')
 if urine_sugar: set_if_exists(input_df, 'UrineSugar_Yes')
 if jaundice_min: set_if_exists(input_df, 'Jaundice_Minimal')
@@ -78,25 +76,32 @@ if st.button("Predict Risk"):
     st.subheader(f"Prediction: {risk_level}")
     st.write(f"**Probability of High Risk:** {probability:.2%}")
 
-    # === SHAP explanation ===
-    st.subheader("🔍 Top Factors Influencing This Prediction")
+    # === SHAP Text Explanation (no plots) ===
+    st.subheader("📋 Key Factors Influencing This Prediction")
 
-    # Create SHAP explainer
-    explainer = shap.Explainer(model, input_df)
-    shap_values = explainer(input_df)
+    try:
+        explainer = shap.Explainer(model, input_df)
+        shap_values = explainer(input_df)
 
-    # Fix for single-row SHAP output
-    shap_array = shap_values.values[0] if hasattr(shap_values, "values") else shap_values[0].values
-    shap_series = pd.Series(shap_array, index=input_df.columns)
-    shap_series = shap_series.sort_values(key=np.abs, ascending=False)
+        # Handle shap values for single-row input
+        if hasattr(shap_values, "values"):
+            shap_array = shap_values.values[0]
+        else:
+            shap_array = shap_values[0].values
 
-    # Show top 5 features in simple language
-    for feature, value in shap_series.head(5).items():
-        direction = "increased" if value > 0 else "decreased"
-        emoji = "🔺" if value > 0 else "🔻"
-        st.write(f"{emoji} **{feature}** — {direction} the risk")
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
+        top_factors = shap_series[shap_series.abs() > 0.001].head(5)
 
-    # Optional: SHAP bar chart
-    fig, ax = plt.subplots(figsize=(10, 5))
-    shap.plots.bar(shap_values[0], show=False)
-    st.pyplot(fig)
+        if not top_factors.empty:
+            for feature, value in top_factors.items():
+                direction = "increased" if value > 0 else "decreased"
+                emoji = "🔺" if value > 0 else "🔻"
+                st.markdown(f"- {emoji} **{feature}** — {direction} the risk")
+        else:
+            st.info("No major features significantly influenced this prediction.")
+
+    except Exception as e:
+        st.warning("Could not generate explanation.")
+        st.text(str(e))
+
