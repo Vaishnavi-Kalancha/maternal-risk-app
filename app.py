@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import shap
 
 # === Load model and feature order ===
 model = joblib.load("model.pkl")
@@ -34,8 +33,10 @@ bp = st.selectbox("Blood Pressure", [
 ])
 urine_albumin = st.selectbox("Urine Albumin", ["None", "Minimal", "Medium"])
 
-# === Prepare Input DataFrame ===
+# === Build input row ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
+
+# Set numeric inputs
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
 input_df.at[0, 'Height'] = height
@@ -46,7 +47,7 @@ def set_if_exists(df, col):
     if col in df.columns:
         df.at[0, col] = 1
 
-# Set binary and categorical features
+# Set encoded categorical values
 if anemia_min: set_if_exists(input_df, 'Anemia_Minimal')
 if urine_sugar: set_if_exists(input_df, 'UrineSugar_Yes')
 if jaundice_min: set_if_exists(input_df, 'Jaundice_Minimal')
@@ -60,12 +61,11 @@ set_if_exists(input_df, f'BloodPressure_{bp}')
 if urine_albumin != "None":
     set_if_exists(input_df, f'UrineAlbumin_{urine_albumin}')
 
-# === Predict and Explain ===
+# === Predict ===
 if st.button("Predict Risk"):
-    prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
+    prediction = model.predict(input_df)[0]
 
-    # Risk level interpretation
     if probability < 0.3:
         risk_level = "✅ Low Risk"
     elif probability < 0.7:
@@ -75,32 +75,3 @@ if st.button("Predict Risk"):
 
     st.subheader(f"Prediction: {risk_level}")
     st.write(f"**Probability of High Risk:** {probability:.2%}")
-
-    # === SHAP Text Explanation (no plots) ===
-    st.subheader("📋 Key Factors Influencing This Prediction")
-
-    try:
-        explainer = shap.Explainer(model, input_df)
-        shap_values = explainer(input_df)
-
-        # Fix for 2D SHAP value outputs (ensures proper shape)
-        shap_array = shap_values.values[0]
-        if shap_array.ndim == 2:
-            shap_array = shap_array[:, 1]  # Select 2nd column if it's multiclass or 2D
-
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
-        top_factors = shap_series.head(5)
-
-        if not top_factors.empty:
-            for feature, value in top_factors.items():
-                direction = "increased" if value > 0 else "decreased"
-                emoji = "🔺" if value > 0 else "🔻"
-                st.markdown(f"- {emoji} **{feature}** — {direction} the risk")
-        else:
-            st.info("No major features significantly influenced this prediction.")
-
-    except Exception as e:
-        st.warning("❌ Could not generate explanation.")
-        st.caption(f"Error: {str(e)}")
-
