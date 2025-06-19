@@ -83,12 +83,7 @@ if st.button("Predict Risk"):
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # Handle shap values for single-row input
-        if hasattr(shap_values, "values"):
-            shap_array = shap_values.values[0]
-        else:
-            shap_array = shap_values[0].values
-
+        shap_array = shap_values[0].values if hasattr(shap_values[0], "values") else shap_values.values[0]
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
         top_factors = shap_series[shap_series.abs() > 0.001].head(5)
@@ -104,4 +99,3 @@ if st.button("Predict Risk"):
     except Exception as e:
         st.warning("Could not generate explanation.")
         st.text(str(e))
-
