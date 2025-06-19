@@ -13,9 +13,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="wide")
 # === Custom CSS for styling ===
 st.markdown("""
     <style>
-    body {
-        background-color: #f5f6fa;
-    }
     .stButton > button {
         background-color: #6c5ce7;
         color: white;
@@ -132,8 +129,10 @@ if st.button("Predict Risk"):
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        shap_array = shap_values.values[0] if hasattr(shap_values, "values") else shap_values[0].values
-        sshap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+        # 🛠 FIX: Use the correct SHAP value slice
+        shap_array = shap_values.values[0] if shap_values.values.ndim == 1 else shap_values.values[0][:]
+
+        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
         for feature, value in shap_series.head(5).items():
             direction = "increased" if value > 0 else "decreased"
