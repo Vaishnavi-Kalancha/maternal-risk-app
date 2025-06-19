@@ -90,7 +90,7 @@ if st.button("Predict Risk"):
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
-        top_factors = shap_series[shap_series.abs() > 0.001].head(5)
+        top_factors = shap_series.head(5)
 
         if not top_factors.empty:
             for feature, value in top_factors.items():
