@@ -133,7 +133,7 @@ if st.button("Predict Risk"):
         shap_values = explainer(input_df)
 
         shap_array = shap_values.values[0] if hasattr(shap_values, "values") else shap_values[0].values
-        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+        sshap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
         for feature, value in shap_series.head(5).items():
             direction = "increased" if value > 0 else "decreased"
