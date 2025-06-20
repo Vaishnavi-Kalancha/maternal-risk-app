@@ -129,8 +129,11 @@ if st.button("Predict Risk"):
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # 🛠 FIX: Use the correct SHAP value slice
-        shap_array = shap_values.values[0] if shap_values.values.ndim == 1 else shap_values.values[0][:]
+        # ✅ FIX: Only use class 1 SHAP values
+        if shap_values.values.ndim == 3:
+            shap_array = shap_values.values[0][:, 1]  # class 1
+        else:
+            shap_array = shap_values.values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
