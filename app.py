@@ -10,33 +10,41 @@ feature_order = joblib.load("feature_order.pkl")
 
 st.set_page_config(page_title="Maternal Risk Predictor", layout="wide")
 
-# === Custom Styling ===
+# === Custom CSS for styling ===
 st.markdown("""
     <style>
-    body {
-        background: linear-gradient(to right, #f5f7fa, #c3cfe2);
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;600;800&display=swap');
+
+    html, body, [class*="css"]  {
+        font-family: 'Nunito', sans-serif;
+        background: linear-gradient(to right, #f8f9fa, #e0eafc);
     }
-    .reportview-container {
-        background: transparent;
-    }
+
     .main-container {
-        background-color: white;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        max-width: 1000px;
-        margin: auto;
+        background-color: #ffffff;
+        padding: 2em;
+        border-radius: 15px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        margin: 2em 0;
     }
+
     .stButton > button {
         background-color: #6c5ce7;
         color: white;
         font-weight: bold;
-    }
-    .risk-box {
-        padding: 1em;
+        font-size: 16px;
         border-radius: 10px;
+        padding: 0.5em 2em;
         margin-top: 1em;
-        font-size: 18px;
+    }
+
+    .risk-box {
+        padding: 1.2em;
+        border-radius: 12px;
+        margin-top: 1em;
+        font-size: 20px;
+        font-weight: bold;
+        text-align: center;
     }
     .low-risk {
         background-color: #dff9fb;
@@ -53,11 +61,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# === App Layout ===
-st.markdown('<div class="main-container">', unsafe_allow_html=True)
-
-st.title("🤰 Maternal Health Risk Predictor")
-st.markdown("### 📝 Enter the patient’s clinical details below")
+# === App Title ===
+st.markdown("""
+    <h1 style='text-align: center;'>🤰 Maternal Health Risk Predictor</h1>
+    <hr style='border: 1px solid #eee;'>
+""", unsafe_allow_html=True)
 
 # === Sidebar About Section ===
 with st.sidebar:
@@ -70,7 +78,10 @@ with st.sidebar:
     [📂 GitHub Repo](https://github.com/Vaishnavi-Kalancha/maternal-risk-app)
     """)
 
-# === Input Fields ===
+# === Form Card ===
+st.markdown('<div class="main-container">', unsafe_allow_html=True)
+
+st.markdown("### 📝 Enter the patient’s clinical details below")
 col1, col2 = st.columns(2)
 
 with col1:
@@ -95,7 +106,10 @@ with col2:
     vdrl_pos = st.checkbox("VDRL Positive")
     fetal_pos_normal = st.checkbox("Fetal Position Normal")
 
-# === Prepare Input Data ===
+# === Close card ===
+st.markdown('</div>', unsafe_allow_html=True)
+
+# === Prepare Input ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
@@ -120,7 +134,7 @@ set_if_exists(input_df, f'BloodPressure_{bp}')
 if urine_albumin != "None":
     set_if_exists(input_df, f'UrineAlbumin_{urine_albumin}')
 
-# === Prediction ===
+# === Predict Risk ===
 if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
@@ -138,7 +152,6 @@ if st.button("Predict Risk"):
     st.markdown(f'<div class="risk-box {risk_class}">Prediction: {risk}</div>', unsafe_allow_html=True)
     st.write(f"**Probability of High Risk:** {probability:.2%}")
 
-    # SHAP Explanation
     st.subheader("📋 Key Factors Influencing This Prediction")
     try:
         explainer = shap.Explainer(model, input_df)
@@ -150,6 +163,7 @@ if st.button("Predict Risk"):
             shap_array = shap_values.values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+
         for feature, value in shap_series.head(5).items():
             direction = "increased" if value > 0 else "decreased"
             emoji = "🔺" if value > 0 else "🔻"
@@ -161,13 +175,12 @@ if st.button("Predict Risk"):
 # === Info Section ===
 with st.expander("ℹ️ How does this app work?"):
     st.markdown("""
-    This app uses a **Random Forest** model trained on clinical data  
-    to assess maternal risk levels based on features like:
-    - **Age**
-    - **Blood Pressure**
-    - **Gestational Age**
-    - **Anemia, Jaundice, Hepatitis**  
-    The model uses **SHAP** explainability to help understand feature influence.
-    """)
+    This app uses a **Random Forest model** trained on clinical data. It analyzes maternal indicators like:
+    - Age
+    - Gestational Age
+    - Blood Pressure
+    - Weight, Height
+    - Lab Indicators (Urine, Sugar, Anemia, etc.)
 
-st.markdown("</div>", unsafe_allow_html=True)
+    🔍 SHAP explainability is included to show which features had the most influence on the model's prediction.
+    """)
