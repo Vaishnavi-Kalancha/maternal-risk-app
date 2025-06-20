@@ -10,78 +10,85 @@ feature_order = joblib.load("feature_order.pkl")
 
 st.set_page_config(page_title="Maternal Risk Predictor", layout="wide")
 
-# === Custom CSS for styling ===
+# === Wellspring-style CSS ===
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;600;800&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap');
 
-    html, body, [class*="css"]  {
-        font-family: 'Nunito', sans-serif;
-        background: linear-gradient(to right, #f8f9fa, #e0eafc);
-    }
+html, body, [class*="css"] {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(120deg, #fdfcfb 0%, #e2d1c3 100%);
+    color: #333;
+}
 
-    .main-container {
-        background-color: #ffffff;
-        padding: 2em;
-        border-radius: 15px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        margin: 2em 0;
-    }
+h1 {
+    color: #2d3436;
+    font-weight: 700;
+    font-size: 2.8em;
+    text-align: center;
+    margin-bottom: 0.2em;
+}
 
-    .stButton > button {
-        background-color: #6c5ce7;
-        color: white;
-        font-weight: bold;
-        font-size: 16px;
-        border-radius: 10px;
-        padding: 0.5em 2em;
-        margin-top: 1em;
-    }
+.subheader {
+    font-size: 1.2em;
+    color: #636e72;
+    text-align: center;
+    margin-bottom: 2em;
+}
 
-    .risk-box {
-        padding: 1.2em;
-        border-radius: 12px;
-        margin-top: 1em;
-        font-size: 20px;
-        font-weight: bold;
-        text-align: center;
-    }
-    .low-risk {
-        background-color: #dff9fb;
-        color: #00b894;
-    }
-    .moderate-risk {
-        background-color: #ffeaa7;
-        color: #d35400;
-    }
-    .high-risk {
-        background-color: #fab1a0;
-        color: #c0392b;
-    }
-    </style>
+.block-container {
+    padding-top: 2rem;
+}
+
+.card {
+    background-color: #ffffff;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.stButton button {
+    background-color: #00b894;
+    color: white;
+    padding: 0.5em 2em;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.risk-box {
+    padding: 1em;
+    border-radius: 10px;
+    margin-top: 1em;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-align: center;
+}
+
+.low-risk {
+    background-color: #dff9fb;
+    color: #00b894;
+}
+
+.moderate-risk {
+    background-color: #ffeaa7;
+    color: #d35400;
+}
+
+.high-risk {
+    background-color: #fab1a0;
+    color: #c0392b;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# === App Title ===
-st.markdown("""
-    <h1 style='text-align: center;'>🤰 Maternal Health Risk Predictor</h1>
-    <hr style='border: 1px solid #eee;'>
-""", unsafe_allow_html=True)
+# === Header ===
+st.markdown("<h1>🤰 Maternal Health Risk Predictor</h1>", unsafe_allow_html=True)
+st.markdown("<div class='subheader'>Enter the patient’s clinical details below</div>", unsafe_allow_html=True)
 
-# === Sidebar About Section ===
-with st.sidebar:
-    st.image("https://img.icons8.com/ios-filled/100/steam-bun.png", width=100)
-    st.markdown("## ℹ️ About")
-    st.markdown("""
-    This app uses a trained machine learning model to **predict maternal health risk** based on clinical indicators.
-
-    **Author**: Vaishnavi Kalancha  
-    [📂 GitHub Repo](https://github.com/Vaishnavi-Kalancha/maternal-risk-app)
-    """)
-
-# === Form Card ===
-st.markdown('<div class="main-container">', unsafe_allow_html=True)
-
-st.markdown("### 📝 Enter the patient’s clinical details below")
+# === Input Form Card ===
+st.markdown("<div class='card'>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 
 with col1:
@@ -106,10 +113,9 @@ with col2:
     vdrl_pos = st.checkbox("VDRL Positive")
     fetal_pos_normal = st.checkbox("Fetal Position Normal")
 
-# === Close card ===
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-# === Prepare Input ===
+# === Create Input DataFrame ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
@@ -149,14 +155,12 @@ if st.button("Predict Risk"):
         risk = "🛑 High Risk"
         risk_class = "high-risk"
 
-    st.markdown(f'<div class="risk-box {risk_class}">Prediction: {risk}</div>', unsafe_allow_html=True)
-    st.write(f"**Probability of High Risk:** {probability:.2%}")
+    st.markdown(f'<div class="risk-box {risk_class}">Prediction: {risk}<br>Probability of High Risk: {probability:.2%}</div>', unsafe_allow_html=True)
 
     st.subheader("📋 Key Factors Influencing This Prediction")
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
-
         if shap_values.values.ndim == 3:
             shap_array = shap_values.values[0][:, 1]
         else:
@@ -172,15 +176,9 @@ if st.button("Predict Risk"):
         st.error("Could not generate explanation.")
         st.exception(e)
 
-# === Info Section ===
+# === Info Footer ===
 with st.expander("ℹ️ How does this app work?"):
     st.markdown("""
-    This app uses a **Random Forest model** trained on clinical data. It analyzes maternal indicators like:
-    - Age
-    - Gestational Age
-    - Blood Pressure
-    - Weight, Height
-    - Lab Indicators (Urine, Sugar, Anemia, etc.)
-
-    🔍 SHAP explainability is included to show which features had the most influence on the model's prediction.
+    This wellness-focused app uses a trained **Random Forest** model to assess **maternal health risk**. 
+    It looks at parameters like **Age, Weight, Gestational Age, BP, etc.**, and provides insights with **SHAP explanations**.
     """)
