@@ -10,9 +10,23 @@ feature_order = joblib.load("feature_order.pkl")
 
 st.set_page_config(page_title="Maternal Risk Predictor", layout="wide")
 
-# === Custom CSS for styling ===
+# === Custom Styling ===
 st.markdown("""
     <style>
+    body {
+        background: linear-gradient(to right, #f5f7fa, #c3cfe2);
+    }
+    .reportview-container {
+        background: transparent;
+    }
+    .main-container {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        max-width: 1000px;
+        margin: auto;
+    }
     .stButton > button {
         background-color: #6c5ce7;
         color: white;
@@ -39,7 +53,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# === App Title ===
+# === App Layout ===
+st.markdown('<div class="main-container">', unsafe_allow_html=True)
+
 st.title("🤰 Maternal Health Risk Predictor")
 st.markdown("### 📝 Enter the patient’s clinical details below")
 
@@ -79,7 +95,7 @@ with col2:
     vdrl_pos = st.checkbox("VDRL Positive")
     fetal_pos_normal = st.checkbox("Fetal Position Normal")
 
-# === Create Input DataFrame ===
+# === Prepare Input Data ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
@@ -104,12 +120,11 @@ set_if_exists(input_df, f'BloodPressure_{bp}')
 if urine_albumin != "None":
     set_if_exists(input_df, f'UrineAlbumin_{urine_albumin}')
 
-# === Predict Risk ===
+# === Prediction ===
 if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
 
-    # Display result
     if probability < 0.3:
         risk = "✅ Low Risk"
         risk_class = "low-risk"
@@ -123,20 +138,18 @@ if st.button("Predict Risk"):
     st.markdown(f'<div class="risk-box {risk_class}">Prediction: {risk}</div>', unsafe_allow_html=True)
     st.write(f"**Probability of High Risk:** {probability:.2%}")
 
-    # SHAP explanations
+    # SHAP Explanation
     st.subheader("📋 Key Factors Influencing This Prediction")
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # ✅ FIX: Only use class 1 SHAP values
         if shap_values.values.ndim == 3:
-            shap_array = shap_values.values[0][:, 1]  # class 1
+            shap_array = shap_values.values[0][:, 1]
         else:
             shap_array = shap_values.values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
-
         for feature, value in shap_series.head(5).items():
             direction = "increased" if value > 0 else "decreased"
             emoji = "🔺" if value > 0 else "🔻"
@@ -145,10 +158,16 @@ if st.button("Predict Risk"):
         st.error("Could not generate explanation.")
         st.exception(e)
 
-# === Optional Info Section ===
+# === Info Section ===
 with st.expander("ℹ️ How does this app work?"):
     st.markdown("""
-    This app uses a machine learning model (Random Forest) trained on clinical data.  
-    It considers maternal indicators like **Age, Gestational Age, Blood Pressure, and others** to predict whether the patient is at **Low, Moderate, or High Risk**.  
-    Predictions are enhanced with **SHAP explainability**, showing how features influence the outcome.
+    This app uses a **Random Forest** model trained on clinical data  
+    to assess maternal risk levels based on features like:
+    - **Age**
+    - **Blood Pressure**
+    - **Gestational Age**
+    - **Anemia, Jaundice, Hepatitis**  
+    The model uses **SHAP** explainability to help understand feature influence.
     """)
+
+st.markdown("</div>", unsafe_allow_html=True)
