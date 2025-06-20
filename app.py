@@ -115,7 +115,7 @@ with col2:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# === Create Input DataFrame ===
+# === Prepare Input ===
 input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
 input_df.at[0, 'Age'] = age
 input_df.at[0, 'Weight'] = weight
@@ -140,7 +140,7 @@ set_if_exists(input_df, f'BloodPressure_{bp}')
 if urine_albumin != "None":
     set_if_exists(input_df, f'UrineAlbumin_{urine_albumin}')
 
-# === Predict Risk ===
+# === Predict and Show Results ===
 if st.button("Predict Risk"):
     prediction = model.predict(input_df)[0]
     probability = model.predict_proba(input_df)[0][1]
@@ -155,30 +155,45 @@ if st.button("Predict Risk"):
         risk = "🛑 High Risk"
         risk_class = "high-risk"
 
-    st.markdown(f'<div class="risk-box {risk_class}">Prediction: {risk}<br>Probability of High Risk: {probability:.2%}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="risk-box {risk_class}">Prediction: {risk}<br>Probability of High Risk: {probability:.2%}</div>',
+        unsafe_allow_html=True
+    )
 
     st.subheader("📋 Key Factors Influencing This Prediction")
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
+
         if shap_values.values.ndim == 3:
             shap_array = shap_values.values[0][:, 1]
         else:
             shap_array = shap_values.values[0]
 
-        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(ascending=False)
 
-        for feature, value in shap_series.head(5).items():
-            direction = "increased" if value > 0 else "decreased"
-            emoji = "🔺" if value > 0 else "🔻"
-            st.write(f"{emoji} **{feature}** — {direction} the risk")
+        pos_contributors = shap_series[shap_series > 0].head(3)
+        neg_contributors = shap_series[shap_series < 0].head(3)
+
+        if not pos_contributors.empty:
+            st.markdown("#### 🔺 Factors that Increased Risk:")
+            for feature, value in pos_contributors.items():
+                st.write(f"🔺 **{feature}** — increased the risk")
+
+        if not neg_contributors.empty:
+            st.markdown("#### 🔻 Factors that Decreased Risk:")
+            for feature, value in neg_contributors.items():
+                st.write(f"🔻 **{feature}** — decreased the risk")
+
+        st.caption("ℹ️ Even though some features reduced risk, overall score may still indicate high risk.")
     except Exception as e:
         st.error("Could not generate explanation.")
         st.exception(e)
 
-# === Info Footer ===
+# === Footer ===
 with st.expander("ℹ️ How does this app work?"):
     st.markdown("""
-    This wellness-focused app uses a trained **Random Forest** model to assess **maternal health risk**. 
-    It looks at parameters like **Age, Weight, Gestational Age, BP, etc.**, and provides insights with **SHAP explanations**.
+    This wellness-focused app uses a trained **Random Forest** model to assess **maternal health risk**.  
+    It analyzes parameters like **Age, Gestational Age, Weight, Blood Pressure**, and more.  
+    You also get **explainable AI (SHAP)** to understand what influenced each prediction.
     """)
