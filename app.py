@@ -128,20 +128,21 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanations ---
+        # --- SHAP Explanation ---
     try:
-        explainer = shap.Explainer(model, input_df)
-        shap_values = explainer(input_df)
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(input_df)
 
-        # Handle SHAP array shape (binary: 2D, multiclass: 3D)
-        if shap_values.values.ndim == 3:
-            shap_array = shap_values.values[0][:, 1]  # For class 1
+        # shap_values is a list for classifiers → we use class 1 (high risk)
+        if isinstance(shap_values, list):
+            shap_array = shap_values[1][0]  # class 1, first instance
         else:
-            shap_array = shap_values.values[0]  # Already 1D
+            shap_array = shap_values[0]  # binary output
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-        # HTML card for explanation
+        # Card layout
         shap_card = """
         <div class="card">
             <h4>📋 Top Factors Influencing This Prediction:</h4>
