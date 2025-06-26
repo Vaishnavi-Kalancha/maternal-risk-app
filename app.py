@@ -147,20 +147,20 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- Card 2: SHAP Top Influences ---
-        # --- Card 2: SHAP Top Influences ---
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # Get SHAP values for class 1 (high risk), if model is binary classifier
         if shap_values.values.ndim == 3:
-            # Multiclass: pick class 1
             shap_array = shap_values.values[0][:, 1]
         else:
-            # Binary: directly use values
             shap_array = shap_values.values[0]
 
-        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+        base_value = shap_values.base_values[0]
+        model_output = base_value + shap_array.sum()
+
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
         shap_card = """
         <div class="card">
