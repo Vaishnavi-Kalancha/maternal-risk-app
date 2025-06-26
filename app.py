@@ -169,15 +169,15 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Card 2: SHAP Top Influences ---
+# --- Card 2: SHAP Top Influences ---
 shap_card = """
 <div class="card">
     <h4>📋 Top Factors Influencing This Prediction:</h4>
 """
 try:
-    explainer = shap.Explainer(model, input_df)
+    explainer = shap.Explainer(model)
     shap_values = explainer(input_df)
-    shap_array = shap_values.values[0] if shap_values.values.ndim == 2 else shap_values.values[0][:, 1]
+    shap_array = shap_values.values[0][:, 1]  # Focus on class 1 (high risk)
     shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
     factors_html = "<ul style='padding-left: 1.2em;'>"
