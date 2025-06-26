@@ -132,10 +132,13 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        if isinstance(shap_values, list):
-            shap_array = shap_values[1][0]  # Multiclass: use class 1
+        # Handle SHAP shape correctly for binary classifier
+        if isinstance(shap_values, list) and len(shap_values) == 2:
+            shap_array = shap_values[1][0]  # class 1, sample 0
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][:, 1]  # (1, features, classes)
         else:
-            shap_array = shap_values[0]     # Binary classifier
+            shap_array = shap_values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
