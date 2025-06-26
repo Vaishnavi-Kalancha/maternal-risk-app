@@ -48,6 +48,11 @@ input, select, textarea {
     margin-top: 1.5em;
 }
 
+.result-label {
+    font-size: 1.4em;
+    margin-bottom: 0.5em;
+}
+
 .risk-high {
     color: #c0392b;
     font-weight: bold;
@@ -61,6 +66,21 @@ input, select, textarea {
 .risk-low {
     color: #27ae60;
     font-weight: bold;
+}
+
+.card hr {
+    margin: 1em 0;
+    border: none;
+    border-top: 1px solid #e0e0e0;
+}
+
+.card h4 {
+    margin-bottom: 0.5em;
+    color: #2d3436;
+}
+
+.card p, .card div {
+    margin: 0.2em 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -141,10 +161,10 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
-    # --- Show Results ---
+    # --- Show Results in a Single Card ---
     st.markdown(f"""
     <div class="card">
-        <div class="{style}" style="font-size: 1.4em;">{label}</div>
+        <div class="{style} result-label">{label}</div>
         <div><strong>Probability of High Risk:</strong> {prob:.2%}</div>
         <hr>
         <h4>📋 Top Factors Influencing This Prediction:</h4>
@@ -156,12 +176,17 @@ if submit:
         shap_array = shap_values.values[0] if shap_values.values.ndim == 2 else shap_values.values[0][:, 1]
         shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
+        factors_html = "<ul style='padding-left: 1.2em;'>"
         for feature, value in shap_series.head(5).items():
             direction = "increased" if value > 0 else "decreased"
             emoji = "🔺" if value > 0 else "🔻"
-            st.markdown(f"{emoji} **{feature}** — {direction} the risk")
+            factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
+        factors_html += "</ul>"
+        st.markdown(factors_html, unsafe_allow_html=True)
+
     except Exception as e:
         st.warning("Could not explain this prediction.")
         st.exception(e)
 
     st.markdown("</div>", unsafe_allow_html=True)
+
