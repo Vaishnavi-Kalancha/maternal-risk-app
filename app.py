@@ -20,17 +20,14 @@ html, body, [class*="css"] {
     background: #f6f8fc;
     color: #2d3436;
 }
-
 h1 {
     text-align: center;
     color: #2c3e50;
     margin-bottom: 0.5em;
 }
-
 input, select, textarea {
     border-radius: 6px !important;
 }
-
 .stButton>button {
     background-color: #6c5ce7;
     color: white;
@@ -39,7 +36,6 @@ input, select, textarea {
     font-weight: 600;
     margin: 1em 0;
 }
-
 .card {
     background-color: white;
     padding: 1.5em;
@@ -47,38 +43,22 @@ input, select, textarea {
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     margin-top: 1.5em;
 }
-
 .result-label {
     font-size: 1.4em;
     margin-bottom: 0.5em;
 }
-
-.risk-high {
-    color: #c0392b;
-    font-weight: bold;
-}
-
-.risk-moderate {
-    color: #d35400;
-    font-weight: bold;
-}
-
-.risk-low {
-    color: #27ae60;
-    font-weight: bold;
-}
-
+.risk-high { color: #c0392b; font-weight: bold; }
+.risk-moderate { color: #d35400; font-weight: bold; }
+.risk-low { color: #27ae60; font-weight: bold; }
 .card hr {
     margin: 1em 0;
     border: none;
     border-top: 1px solid #e0e0e0;
 }
-
 .card h4 {
     margin-bottom: 0.5em;
     color: #2d3436;
 }
-
 .card p, .card div {
     margin: 0.2em 0;
 }
@@ -118,7 +98,6 @@ with st.form("risk_form"):
 
 # --- Prediction Logic ---
 if submit:
-    # Build input DataFrame
     input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
     input_df.at[0, 'Age'] = age
     input_df.at[0, 'Weight'] = weight
@@ -146,11 +125,9 @@ if submit:
     if urine_albumin != "None":
         set_feature(f'UrineAlbumin_{urine_albumin}')
 
-    # Prediction
     prediction = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
-    # Risk Label
     if prob < 0.3:
         label = "✅ Low Risk"
         style = "risk-low"
@@ -161,7 +138,7 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
-    # --- Card 1: Risk Label & Probability ---
+    # --- Card 1: Prediction result ---
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
@@ -169,27 +146,26 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-# --- Card 2: SHAP Top Influences ---
-shap_card = """
-<div class="card">
-    <h4>📋 Top Factors Influencing This Prediction:</h4>
-"""
-try:
-    explainer = shap.Explainer(model)
-    shap_values = explainer(input_df)
-    shap_array = shap_values.values[0][:, 1]  # Focus on class 1 (high risk)
-    shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+    # --- Card 2: SHAP Top Influences ---
+    try:
+        explainer = shap.Explainer(model, input_df)
+        shap_values = explainer(input_df)
+        shap_array = shap_values.values[0] if shap_values.values.ndim == 2 else shap_values.values[0][:, 1]
+        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
-    factors_html = "<ul style='padding-left: 1.2em;'>"
-    for feature, value in shap_series.head(5).items():
-        direction = "increased" if value > 0 else "decreased"
-        emoji = "🔺" if value > 0 else "🔻"
-        factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
-    factors_html += "</ul>"
+        shap_card = """
+        <div class="card">
+            <h4>📋 Top Factors Influencing This Prediction:</h4>
+        """
+        factors_html = "<ul style='padding-left: 1.2em;'>"
+        for feature, value in shap_series.head(5).items():
+            direction = "increased" if value > 0 else "decreased"
+            emoji = "🔺" if value > 0 else "🔻"
+            factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
+        factors_html += "</ul></div>"
 
-    full_card = shap_card + factors_html + "</div>"
-    st.markdown(full_card, unsafe_allow_html=True)
+        st.markdown(shap_card + factors_html, unsafe_allow_html=True)
 
-except Exception as e:
-    st.warning("Could not explain this prediction.")
-    st.exception(e)
+    except Exception as e:
+        st.warning("Could not explain this prediction.")
+        st.exception(e)
