@@ -14,7 +14,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -120,6 +119,7 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
+    # --- Card 1: Prediction result ---
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
@@ -127,22 +127,17 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SHAP Explanations ---
-        # --- SHAP Explanation ---
+    # --- Card 2: SHAP Explanations ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # shap_values is a list for classifiers → we use class 1 (high risk)
-        if isinstance(shap_values, list):
-            shap_array = shap_values[1][0]  # class 1, first instance
-        else:
-            shap_array = shap_values[0]  # binary output
+        # Class 1 (High Risk), for first row
+        shap_array = shap_values[1][0]  # 1D array
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-        # Card layout
         shap_card = """
         <div class="card">
             <h4>📋 Top Factors Influencing This Prediction:</h4>
