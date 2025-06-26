@@ -125,7 +125,6 @@ if submit:
     if urine_albumin != "None":
         set_feature(f'UrineAlbumin_{urine_albumin}')
 
-    # --- Prediction ---
     prediction = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
@@ -139,7 +138,7 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
-    # --- Card 1: Risk Prediction ---
+    # --- Card 1: Prediction result ---
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
@@ -152,7 +151,11 @@ if submit:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        shap_array = shap_values.values[0]  # ✅ Binary classification
+        # Fix for models returning (n_samples, n_features, n_classes)
+        if shap_values.values.ndim == 3:
+            shap_array = shap_values.values[0][:, 1]  # class 1: high risk
+        else:
+            shap_array = shap_values.values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
