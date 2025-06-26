@@ -161,12 +161,17 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
-    # --- Show Results in a Single Card ---
+    # --- Card 1: Risk Label & Probability ---
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
         <div><strong>Probability of High Risk:</strong> {prob:.2%}</div>
-        <hr>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Card 2: SHAP Top Influences ---
+    st.markdown(f"""
+    <div class="card">
         <h4>📋 Top Factors Influencing This Prediction:</h4>
     """, unsafe_allow_html=True)
 
@@ -188,5 +193,4 @@ if submit:
         st.warning("Could not explain this prediction.")
         st.exception(e)
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
+    st.markdown("</div>", unsafe_allow_html=True)  # Close second card
