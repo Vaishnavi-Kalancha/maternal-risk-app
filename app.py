@@ -14,26 +14,18 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
     color: #2d3436;
 }
-h1 {
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 0.5em;
-}
-input, select, textarea {
-    border-radius: 6px !important;
-}
+h1 { text-align: center; color: #2c3e50; margin-bottom: 0.5em; }
+input, select, textarea { border-radius: 6px !important; }
 .stButton>button {
-    background-color: #6c5ce7;
-    color: white;
-    border-radius: 8px;
-    padding: 0.4em 1.5em;
-    font-weight: 600;
-    margin: 1em 0;
+    background-color: #6c5ce7; color: white;
+    border-radius: 8px; padding: 0.4em 1.5em;
+    font-weight: 600; margin: 1em 0;
 }
 .card {
     background-color: white;
@@ -42,10 +34,7 @@ input, select, textarea {
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     margin-top: 1.5em;
 }
-.result-label {
-    font-size: 1.4em;
-    margin-bottom: 0.5em;
-}
+.result-label { font-size: 1.4em; margin-bottom: 0.5em; }
 .risk-high { color: #c0392b; font-weight: bold; }
 .risk-moderate { color: #d35400; font-weight: bold; }
 .risk-low { color: #27ae60; font-weight: bold; }
@@ -54,13 +43,8 @@ input, select, textarea {
     border: none;
     border-top: 1px solid #e0e0e0;
 }
-.card h4 {
-    margin-bottom: 0.5em;
-    color: #2d3436;
-}
-.card p, .card div {
-    margin: 0.2em 0;
-}
+.card h4 { margin-bottom: 0.5em; color: #2d3436; }
+.card p, .card div { margin: 0.2em 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,7 +54,6 @@ st.title("🤰 Maternal Health Risk Predictor")
 # --- Form Layout ---
 with st.form("risk_form"):
     col1, col2 = st.columns(2)
-
     with col1:
         age = st.number_input("Age", 15, 50, 25)
         weight = st.number_input("Weight (kg)", 30.0, 120.0, 60.0)
@@ -137,7 +120,6 @@ if submit:
         label = "🛑 High Risk"
         style = "risk-high"
 
-    # --- Card 1: Prediction result ---
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
@@ -145,16 +127,21 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Card 2: SHAP Explanation ---
+    # --- SHAP Explanations ---
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # Select class 1 (High Risk) values
-        shap_array = shap_values.values[0][:, 1] if shap_values.values.ndim == 3 else shap_values.values[0]
+        # Handle SHAP array shape (binary: 2D, multiclass: 3D)
+        if shap_values.values.ndim == 3:
+            shap_array = shap_values.values[0][:, 1]  # For class 1
+        else:
+            shap_array = shap_values.values[0]  # Already 1D
 
-        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
+        # HTML card for explanation
         shap_card = """
         <div class="card">
             <h4>📋 Top Factors Influencing This Prediction:</h4>
