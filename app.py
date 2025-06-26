@@ -14,7 +14,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -146,19 +145,15 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Card 2: SHAP Top Influences ---
+    # --- Card 2: SHAP Explanation ---
     try:
         explainer = shap.Explainer(model, input_df)
         shap_values = explainer(input_df)
 
-        # Fix for models returning (n_samples, n_features, n_classes)
-        if shap_values.values.ndim == 3:
-            shap_array = shap_values.values[0][:, 1]  # class 1: high risk
-        else:
-            shap_array = shap_values.values[0]
+        # Select class 1 (High Risk) values
+        shap_array = shap_values.values[0][:, 1] if shap_values.values.ndim == 3 else shap_values.values[0]
 
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
+        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
         shap_card = """
         <div class="card">
