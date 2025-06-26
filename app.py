@@ -170,27 +170,26 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- Card 2: SHAP Top Influences ---
-    st.markdown(f"""
-    <div class="card">
-        <h4>📋 Top Factors Influencing This Prediction:</h4>
-    """, unsafe_allow_html=True)
+shap_card = """
+<div class="card">
+    <h4>📋 Top Factors Influencing This Prediction:</h4>
+"""
+try:
+    explainer = shap.Explainer(model, input_df)
+    shap_values = explainer(input_df)
+    shap_array = shap_values.values[0] if shap_values.values.ndim == 2 else shap_values.values[0][:, 1]
+    shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
 
-    try:
-        explainer = shap.Explainer(model, input_df)
-        shap_values = explainer(input_df)
-        shap_array = shap_values.values[0] if shap_values.values.ndim == 2 else shap_values.values[0][:, 1]
-        shap_series = pd.Series(shap_array, index=input_df.columns).sort_values(key=np.abs, ascending=False)
+    factors_html = "<ul style='padding-left: 1.2em;'>"
+    for feature, value in shap_series.head(5).items():
+        direction = "increased" if value > 0 else "decreased"
+        emoji = "🔺" if value > 0 else "🔻"
+        factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
+    factors_html += "</ul>"
 
-        factors_html = "<ul style='padding-left: 1.2em;'>"
-        for feature, value in shap_series.head(5).items():
-            direction = "increased" if value > 0 else "decreased"
-            emoji = "🔺" if value > 0 else "🔻"
-            factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
-        factors_html += "</ul>"
-        st.markdown(factors_html, unsafe_allow_html=True)
+    full_card = shap_card + factors_html + "</div>"
+    st.markdown(full_card, unsafe_allow_html=True)
 
-    except Exception as e:
-        st.warning("Could not explain this prediction.")
-        st.exception(e)
-
-    st.markdown("</div>", unsafe_allow_html=True)  # Close second card
+except Exception as e:
+    st.warning("Could not explain this prediction.")
+    st.exception(e)
