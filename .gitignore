@@ -1,0 +1,13 @@
+
+# Ignore dataset and model files
+*.xlsx
+*.pkl
+*.png
+
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore Streamlit cache
+.streamlit/
+.stcache/
