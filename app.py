@@ -86,67 +86,61 @@ if submit:
     input_df.at[0, 'GestationalAge'] = gest_age
     input_df.at[0, 'FetalHeartbeat'] = fhr
 
-    # Reset one-hot groups properly
-    def set_one_hot(group_prefix, selected_value):
-        for col in feature_order:
-            if col.startswith(group_prefix + "_"):
-                input_df.at[0, col] = 1 if col == f"{group_prefix}_{selected_value}" else 0
+    def set_feature(col_name):
+        if col_name in input_df.columns:
+            input_df.at[0, col_name] = 1
 
-    set_one_hot("Gravida", gravida)
-    set_one_hot("TetanusDose", tetanus)
-    set_one_hot("BloodPressure", bp)
+    for cond, name in [
+        (anemia_min, 'Anemia_Minimal'),
+        (urine_sugar, 'UrineSugar_Yes'),
+        (jaundice_min, 'Jaundice_Minimal'),
+        (hepatitis_b, 'HepatitisB_Positive'),
+        (vdrl_pos, 'VDRL_Positive'),
+        (fetal_pos_normal, 'FetalPosition_Normal')
+    ]:
+        if cond: set_feature(name)
+
+    set_feature(f'Gravida_{gravida}')
+    set_feature(f'TetanusDose_{tetanus}')
+    set_feature(f'BloodPressure_{bp}')
     if urine_albumin != "None":
-        set_one_hot("UrineAlbumin", urine_albumin)
+        set_feature(f'UrineAlbumin_{urine_albumin}')
 
-    # Binary features
-    binary_features = {
-        "Anemia_Minimal": anemia_min,
-        "UrineSugar_Yes": urine_sugar,
-        "Jaundice_Minimal": jaundice_min,
-        "HepatitisB_Positive": hepatitis_b,
-        "VDRL_Positive": vdrl_pos,
-        "FetalPosition_Normal": fetal_pos_normal
-    }
-    for feature, is_selected in binary_features.items():
-        if feature in input_df.columns:
-            input_df.at[0, feature] = int(is_selected)
-
-    # Prediction
     prediction = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
     if prob < 0.3:
         label = "✅ Low Risk"
         style = "risk-low"
+        comment = "No major risk indicators detected."
     elif prob < 0.7:
         label = "⚠️ Moderate Risk"
         style = "risk-moderate"
+        comment = "Some concerning factors detected. Closer monitoring recommended."
     else:
         label = "🛑 High Risk"
         style = "risk-high"
+        comment = "Immediate clinical attention may be required."
 
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
         <div><strong>Probability of High Risk:</strong> {prob:.2%}</div>
+        <div><em>{comment}</em></div>
     </div>
     """, unsafe_allow_html=True)
 
-    # SHAP explanation
     # --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Handle SHAP output shape safely
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1 (High Risk)
+            shap_array = shap_values[1][0]  # Binary classifier: class 1 SHAP values
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
-            shap_array = shap_values[0]  # Already 1D for binary
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][0, :, 1]  # Rare case (samples, features, classes)
+            shap_array = shap_values[0]
         else:
-            raise ValueError("Unsupported SHAP output format.")
+            shap_array = shap_values[0][0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
@@ -160,9 +154,10 @@ if submit:
             for feature, value in shap_series.head(5).items():
                 factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
             factors_html += "</ul></div>"
+
             st.markdown(shap_card + factors_html, unsafe_allow_html=True)
         else:
-            st.info("✅ No factors significantly increased the risk.")
+            st.info("No strong features increasing the risk were found.")
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
