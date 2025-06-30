@@ -126,19 +126,24 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanation ---
+# --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Handle binary classifier SHAP output
+        # ✅ Fix for SHAP shape (binary classification case)
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
+            shap_array = shap_values[1][0]  # class 1, sample 0
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][0, :, 1]  # shape: (1, features, 2) → class 1
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
+            shap_array = shap_values[0]  # already correct
         else:
-            shap_array = shap_values[0]
+            raise ValueError("Unexpected SHAP shape")
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
 
-        # ✅ Show only active + positively contributing features
+        # ✅ Only show features that are non-zero AND increased risk
         active_features = input_df.columns[input_df.iloc[0] != 0]
         positive_shap = shap_series[active_features][shap_series[active_features] > 0]
         sorted_positive = positive_shap.sort_values(ascending=False)
