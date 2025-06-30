@@ -1,6 +1,6 @@
 # 🤰 Maternal Health Risk Prediction Web App
 
-This is a machine learning web application that predicts whether a pregnant individual is at **high risk** or **low risk** based on clinical data collected during antenatal care. The model is trained using **Gradient Boosting Classifier**, and the application is built and deployed with **Streamlit**.
+This is a machine learning web application that predicts whether a pregnant individual is at **Low**, **Moderate**, or **High Risk** based on clinical data collected during antenatal care. The model is trained using a **Random Forest Classifier**, and the application is built and deployed with **Streamlit**.
 
 🔗 **Live Demo**: [Click here to try the app](https://maternal-risk-app-fequ2kxspfmfvgkzf67wkk.streamlit.app/)
 
@@ -8,27 +8,30 @@ This is a machine learning web application that predicts whether a pregnant indi
 
 ## 🚀 Features
 
-- Predicts maternal risk as **High Risk** or **Low Risk**
-- Interactive form to input patient details
+- Predicts maternal risk as **Low**, **Moderate**, or **High**
+- Interactive form to input clinical characteristics
 - Trained on real-world antenatal care data
-- Uses **SHAP** for model explainability
-- Deployed online with **Streamlit Cloud**
+- **SHAP explainability** to highlight key contributing factors
+- Clean and responsive UI with custom CSS
+- Fully deployed online with **Streamlit Cloud**
 
 ---
 
 ## 📷 Screenshot
 
-*(Add screenshot of your app if you like)*
+*(You can add a screenshot like `shap_summary_bar.png` or the app UI if desired)*
 
 ---
 
 ## 🧠 Machine Learning Model
 
-- Algorithm: `GradientBoostingClassifier`
-- Evaluation:
-  - Accuracy: ~96%
-  - F1 Score: ~0.97
-- Explainability: SHAP Summary + Bar plots
+- Algorithm: `RandomForestClassifier`
+- Dataset: Preprocessed and balanced with **SMOTE**
+- Evaluation (70:30 split):
+  - Accuracy: **94.67%**
+  - F1 Score: **95.96%**
+  - ROC AUC: **99.20%**
+- Explainability: Integrated SHAP plots per prediction
 
 ---
 
@@ -36,11 +39,12 @@ This is a machine learning web application that predicts whether a pregnant indi
 
 | Tool | Purpose |
 |------|---------|
-| **Python** | Programming Language |
-| **scikit-learn** | Machine Learning |
-| **SHAP** | Model Explainability |
-| **Pandas / NumPy** | Data Handling |
-| **Streamlit** | Web UI |
+| **Python** | Core Programming Language |
+| **scikit-learn** | Machine Learning Algorithms |
+| **SHAP** | Explainable AI |
+| **Pandas, NumPy** | Data Processing |
+| **Streamlit** | Web UI Framework |
+| **Joblib** | Model Serialization |
 | **Git + GitHub** | Version Control & Hosting |
 
 ---
