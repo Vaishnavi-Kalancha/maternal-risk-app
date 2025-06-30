@@ -131,18 +131,22 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanation ---
+       # --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
+        # Detect and extract correct SHAP array
+        shap_array = None
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
-            shap_array = shap_values[0]
-        else:
-            shap_array = None
-
-        if shap_array is not None and len(shap_array) == len(input_df.columns):
+            shap_array = shap_values[1][0]  # For binary classifier, class 1
+        elif isinstance(shap_values, np.ndarray):
+            if shap_values.ndim == 2 and shap_values.shape[0] == 1:
+                shap_array = shap_values[0]
+            elif shap_values.ndim == 2 and shap_values.shape[1] == len(input_df.columns):
+                shap_array = shap_values[0]
+        
+        if shap_array is not None and shap_array.shape[0] == len(input_df.columns):
             shap_series = pd.Series(shap_array, index=input_df.columns)
             shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
