@@ -19,7 +19,7 @@ html, body, [class*="css"] {
     background: #f6f8fc;
     color: #2d3436;
 }
-h1 { text-align: center; color: #2c3e50; margin-bottom: 0.5em; }
+h1 { text-align: center; color: #c0392b; margin-bottom: 0.5em; }
 input, select, textarea { border-radius: 6px !important; }
 .stButton>button {
     background-color: #6c5ce7; color: white;
@@ -47,10 +47,10 @@ input, select, textarea { border-radius: 6px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Header ---
+# --- Title ---
 st.title("🤰 Maternal Health Risk Predictor")
 
-# --- Form Layout ---
+# --- Form Input ---
 with st.form("risk_form"):
     col1, col2 = st.columns(2)
     with col1:
@@ -77,7 +77,7 @@ with st.form("risk_form"):
 
     submit = st.form_submit_button("Predict Risk")
 
-# --- Prediction Logic ---
+# --- Prediction ---
 if submit:
     input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
     input_df.at[0, 'Age'] = age
@@ -90,6 +90,7 @@ if submit:
         if col_name in input_df.columns:
             input_df.at[0, col_name] = 1
 
+    # Set binary features
     for cond, name in [
         (anemia_min, 'Anemia_Minimal'),
         (urine_sugar, 'UrineSugar_Yes'),
@@ -98,8 +99,10 @@ if submit:
         (vdrl_pos, 'VDRL_Positive'),
         (fetal_pos_normal, 'FetalPosition_Normal')
     ]:
-        if cond: set_feature(name)
+        if cond:
+            set_feature(name)
 
+    # Set one-hot features
     set_feature(f'Gravida_{gravida}')
     set_feature(f'TetanusDose_{tetanus}')
     set_feature(f'BloodPressure_{bp}')
@@ -130,39 +133,38 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SHAP Explanation ---
-        # --- SHAP Explanation ---
+    # --- SHAP Explainability ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Robustly flatten shap_values
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1 SHAP for sample 0
+            shap_array = shap_values[1][0]
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
             shap_array = shap_values[0]
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][0]  # Try to flatten (1, features, 2)
+            shap_array = shap_values[0][0]
         else:
             raise ValueError("Unexpected SHAP output shape.")
 
         if shap_array.shape[0] != input_df.shape[1]:
-            raise ValueError("SHAP output shape mismatch.")
+            raise ValueError("SHAP shape mismatch")
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
         if not shap_series.empty:
-            st.markdown(
-                "<div class='card'><h4>📋 Top Factors Increasing Risk:</h4><ul style='padding-left: 1.2em;'>"
-                + "".join(
-                    f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-                    for feature in shap_series.head(5).index
-                )
-                + "</ul></div>",
-                unsafe_allow_html=True
-            )
+            shap_card = """
+            <div class="card">
+                <h4>📋 Top Factors Increasing Risk:</h4>
+                <ul style='padding-left: 1.2em;'>
+            """
+            for feature, value in shap_series.head(5).items():
+                shap_card += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
+            shap_card += "</ul></div>"
+
+            st.markdown(shap_card, unsafe_allow_html=True)
         else:
             st.info("No strong features increasing the risk were found.")
-    except Exception as e:
+    except Exception:
         st.warning("Could not explain this prediction.")
