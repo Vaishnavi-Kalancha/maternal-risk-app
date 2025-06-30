@@ -133,37 +133,36 @@ if submit:
     """, unsafe_allow_html=True)
 
     # SHAP explanation
+    # --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Binary classification handling
+        # Handle SHAP output shape safely
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1, sample 0
-        elif isinstance(shap_values, np.ndarray):
-            shap_array = shap_values[0]     # Already single class case
+            shap_array = shap_values[1][0]  # Class 1 (High Risk)
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
+            shap_array = shap_values[0]  # Already 1D for binary
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][0, :, 1]  # Rare case (samples, features, classes)
         else:
-            shap_array = shap_values[0]     # Fallback
+            raise ValueError("Unsupported SHAP output format.")
 
-        # Convert to Series
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
-        if shap_series.empty:
-            explanation_html = "<p>No features strongly increased the risk.</p>"
-        else:
-            explanation_html = "<ul style='padding-left: 1.2em;'>"
+        if not shap_series.empty:
+            shap_card = """
+            <div class="card">
+                <h4>📋 Top Factors Increasing Risk:</h4>
+            """
+            factors_html = "<ul style='padding-left: 1.2em;'>"
             for feature, value in shap_series.head(5).items():
-                emoji = "🔺"
-                explanation_html += f"<li>{emoji} <strong>{feature}</strong> — increased the risk</li>"
-            explanation_html += "</ul>"
-
-        st.markdown(f"""
-        <div class="card">
-            <h4>📋 Top Factors Increasing Risk:</h4>
-            {explanation_html}
-        </div>
-        """, unsafe_allow_html=True)
+                factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
+            factors_html += "</ul></div>"
+            st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+        else:
+            st.info("✅ No factors significantly increased the risk.")
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
