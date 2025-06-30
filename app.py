@@ -135,14 +135,16 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Safely handle SHAP formats
-        shap_array = None
+        # Get SHAP values based on format
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
+            shap_array = shap_values[1][0]  # For class 1 (high risk)
+        elif isinstance(shap_values, np.ndarray):
             shap_array = shap_values[0]
-        
-        if shap_array is not None and shap_array.shape[0] == len(input_df.columns):
+        else:
+            shap_array = None
+
+        # Validate length before Series creation
+        if shap_array is not None and len(shap_array) == len(input_df.columns):
             shap_series = pd.Series(shap_array, index=input_df.columns)
             shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
