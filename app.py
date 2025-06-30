@@ -14,7 +14,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -48,7 +47,6 @@ input, select, textarea { border-radius: 6px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Header ---
 st.title("🤰 Maternal Health Risk Predictor")
 
 # --- Form Layout ---
@@ -132,34 +130,32 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Handle binary classification SHAP output
+        # Handle binary classifier SHAP output
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # class 1, sample 0
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][:, 1]  # shape: (1, features, classes)
+            shap_array = shap_values[1][0]
         else:
             shap_array = shap_values[0]
 
-        # Ensure correct shape for Series
-        shap_array = np.array(shap_array).flatten()
-        if shap_array.shape[0] != input_df.shape[1]:
-            raise ValueError(f"SHAP value shape {shap_array.shape} doesn't match input shape {input_df.shape[1]}")
-
         shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-        shap_card = """
-        <div class="card">
-            <h4>📋 Top Factors Influencing This Prediction:</h4>
-        """
-        factors_html = "<ul style='padding-left: 1.2em;'>"
-        for feature, value in shap_series.head(5).items():
-            direction = "increased" if value > 0 else "decreased"
-            emoji = "🔺" if value > 0 else "🔻"
-            factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
-        factors_html += "</ul></div>"
+        # ✅ Show only active + positively contributing features
+        active_features = input_df.columns[input_df.iloc[0] != 0]
+        positive_shap = shap_series[active_features][shap_series[active_features] > 0]
+        sorted_positive = positive_shap.sort_values(ascending=False)
 
-        st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+        if not sorted_positive.empty:
+            shap_card = """
+            <div class="card">
+                <h4>📋 Top Factors Increasing This Risk:</h4>
+            """
+            factors_html = "<ul style='padding-left: 1.2em;'>"
+            for feature, value in sorted_positive.head(5).items():
+                factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
+            factors_html += "</ul></div>"
+
+            st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+        else:
+            st.info("No strong contributing factors detected for increased risk.")
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
