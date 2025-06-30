@@ -1,8 +1,9 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import numpy as np
 import joblib
 import shap
+import matplotlib.pyplot as plt
 
 # Load model and feature order
 model = joblib.load("model.pkl")
@@ -128,33 +129,30 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanations ---
-try:
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(input_df)
+    try:
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(input_df)
 
-    # Check if it's binary classification: shap_values will be a list
-    if isinstance(shap_values, list) and len(shap_values) > 1:
-        shap_array = shap_values[1][0]  # Class 1 (high risk)
-    else:
-        shap_array = shap_values[0]     # Binary: direct SHAP array for sample 0
+        # For binary classification, shap_values is list of [class0, class1]
+        shap_array = shap_values[1][0] if isinstance(shap_values, list) and len(shap_values) > 1 else shap_values[0]
 
-    shap_series = pd.Series(shap_array, index=input_df.columns)
-    shap_series = shap_series.sort_values(key=np.abs, ascending=False)
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-    # Build HTML explanation
-    shap_card = """
-    <div class="card">
-        <h4>📋 Top Factors Influencing This Prediction:</h4>
-    """
-    factors_html = "<ul style='padding-left: 1.2em;'>"
-    for feature, value in shap_series.head(5).items():
-        direction = "increased" if value > 0 else "decreased"
-        emoji = "🔺" if value > 0 else "🔻"
-        factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
-    factors_html += "</ul></div>"
+        # Build HTML explanation
+        shap_card = """
+        <div class="card">
+            <h4>📋 Top Factors Influencing This Prediction:</h4>
+        """
+        factors_html = "<ul style='padding-left: 1.2em;'>"
+        for feature, value in shap_series.head(5).items():
+            direction = "increased" if value > 0 else "decreased"
+            emoji = "🔺" if value > 0 else "🔻"
+            factors_html += f"<li>{emoji} <strong>{feature}</strong> — {direction} the risk</li>"
+        factors_html += "</ul></div>"
 
-    st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+        st.markdown(shap_card + factors_html, unsafe_allow_html=True)
 
-except Exception as e:
-    st.warning("Could not explain this prediction.")
-    st.exception(e)
+    except Exception as e:
+        st.warning("Could not explain this prediction.")
+        st.exception(e)
