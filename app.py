@@ -14,6 +14,7 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -79,7 +80,7 @@ with st.form("risk_form"):
 
 # --- Prediction Logic ---
 if submit:
-    input_df = pd.DataFrame([[0] * len(feature_order)], columns=feature_order)
+    input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
     input_df.at[0, 'Age'] = age
     input_df.at[0, 'Weight'] = weight
     input_df.at[0, 'Height'] = height
@@ -90,6 +91,31 @@ if submit:
         if col_name in input_df.columns:
             input_df.at[0, col_name] = 1
 
+    # One-hot field resets
+    for dose in ["1st", "2nd", "3rd"]:
+        set_feature(f"TetanusDose_{dose}")  # Reset all, overwrite below
+        input_df.at[0, f"TetanusDose_{dose}"] = 0
+    set_feature(f'TetanusDose_{tetanus}')
+
+    for g in ["1st", "2nd", "3rd"]:
+        set_feature(f"Gravida_{g}")
+        input_df.at[0, f"Gravida_{g}"] = 0
+    set_feature(f'Gravida_{gravida}')
+
+    for b in [
+        "100/60", "100/65", "100/70", "110/55", "110/60",
+        "110/65", "110/80", "120/60", "80/60", "90/60"
+    ]:
+        set_feature(f"BloodPressure_{b}")
+        input_df.at[0, f"BloodPressure_{b}"] = 0
+    set_feature(f'BloodPressure_{bp}')
+
+    if urine_albumin != "None":
+        for ua in ["Minimal", "Medium"]:
+            input_df.at[0, f"UrineAlbumin_{ua}"] = 0
+        set_feature(f'UrineAlbumin_{urine_albumin}')
+
+    # Binary indicators
     for cond, name in [
         (anemia_min, 'Anemia_Minimal'),
         (urine_sugar, 'UrineSugar_Yes'),
@@ -99,12 +125,6 @@ if submit:
         (fetal_pos_normal, 'FetalPosition_Normal')
     ]:
         if cond: set_feature(name)
-
-    set_feature(f'Gravida_{gravida}')
-    set_feature(f'TetanusDose_{tetanus}')
-    set_feature(f'BloodPressure_{bp}')
-    if urine_albumin != "None":
-        set_feature(f'UrineAlbumin_{urine_albumin}')
 
     prediction = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
@@ -131,40 +151,33 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Handle multiple SHAP formats
+        # Binary classification → shap_values is a list of arrays
         if isinstance(shap_values, list) and len(shap_values) == 2:
             shap_array = shap_values[1][0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0, :, 1]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2 and shap_values.shape[1] == 2:
-            shap_array = shap_values[:, 1]
         else:
             shap_array = shap_values[0]
 
-        # Ensure it's 1D
+        # Ensure 1D
         if shap_array.ndim == 2:
-            shap_array = shap_array[:, 1]
+            shap_array = shap_array[:, 1]  # Shape (features, 2)
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
-        positive_impact = shap_series[shap_series > 0].sort_values(ascending=False)
+        shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
-        if positive_impact.empty:
-            st.markdown("""
-            <div class="card">
-                <h4>📋 Top Factors Influencing This Prediction:</h4>
-                <p>No strong risk-increasing factors were found.</p>
-            </div>
-            """, unsafe_allow_html=True)
+        shap_card = """
+        <div class="card">
+            <h4>📋 Top Factors Increasing Risk:</h4>
+        """
+        if shap_series.empty:
+            shap_card += "<p>No major contributors identified for this prediction.</p></div>"
         else:
-            shap_card = """
-            <div class="card">
-                <h4>📋 Top Factors Increasing Risk:</h4>
-            """
             factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in positive_impact.head(5).items():
+            for feature, value in shap_series.head(5).items():
                 factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
             factors_html += "</ul></div>"
-            st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+            shap_card += factors_html
+
+        st.markdown(shap_card, unsafe_allow_html=True)
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
