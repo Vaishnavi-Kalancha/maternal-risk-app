@@ -129,12 +129,16 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanations ---
+       # --- SHAP Explanations ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # For binary classification, shap_values is list of [class0, class1]
-        shap_array = shap_values[1][0] if isinstance(shap_values, list) and len(shap_values) > 1 else shap_values[0]
+        # For binary classification, shap_values is a list [class0, class1]
+        if isinstance(shap_values, list) and len(shap_values) == 2:
+            shap_array = shap_values[1][0]  # Class 1 (High Risk), shape: (n_features,)
+        else:
+            shap_array = shap_values[0]     # Single array case
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
