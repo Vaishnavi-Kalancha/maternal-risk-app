@@ -14,6 +14,7 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -112,50 +113,58 @@ if submit:
     if prob < 0.3:
         label = "✅ Low Risk"
         style = "risk-low"
+        explanation_text = "<p>This pregnancy is categorized as low risk based on the current inputs.</p>"
     elif prob < 0.7:
         label = "⚠️ Moderate Risk"
         style = "risk-moderate"
+        explanation_text = ""
     else:
         label = "🛑 High Risk"
         style = "risk-high"
+        explanation_text = ""
 
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
         <div><strong>Probability of High Risk:</strong> {prob:.2%}</div>
+        {explanation_text}
     </div>
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanation ---
-    try:
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(input_df)
+    if prob >= 0.3:
+        try:
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(input_df)
 
-        # Binary classification
-        if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
-        else:
-            shap_array = shap_values[0]
+            if isinstance(shap_values, list) and len(shap_values) == 2:
+                shap_array = shap_values[1][0]  # Class 1
+            elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+                shap_array = shap_values[0, :, 1]
+            elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2 and shap_values.shape[1] == 2:
+                shap_array = shap_values[:, 1]
+            else:
+                shap_array = shap_values[0]
 
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_positive = shap_series[shap_series > 0].sort_values(ascending=False)
+            # Ensure it's 1D
+            if shap_array.ndim == 2:
+                shap_array = shap_array[:, 1]  # Pick class 1
 
-        shap_card = """
-        <div class="card">
-            <h4>📋 Top Factors Influencing This Prediction:</h4>
-        """
+            shap_series = pd.Series(shap_array, index=input_df.columns)
+            shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
-        if not shap_positive.empty:
+            shap_card = """
+            <div class="card">
+                <h4>📋 Top Factors Increasing Risk:</h4>
+            """
             factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in shap_positive.head(5).items():
-                factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-            factors_html += "</ul>"
-        else:
-            factors_html = "<p>✅ None of the features significantly increased the risk.</p>"
+            for feature, value in shap_series.head(5).items():
+                emoji = "🔺"
+                factors_html += f"<li>{emoji} <strong>{feature}</strong> — increased the risk</li>"
+            factors_html += "</ul></div>"
 
-        factors_html += "</div>"
-        st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+            st.markdown(shap_card + factors_html, unsafe_allow_html=True)
 
-    except Exception as e:
-        st.warning("Could not explain this prediction.")
-        st.exception(e)
+        except Exception as e:
+            st.warning("Could not explain this prediction.")
+            st.exception(e)
