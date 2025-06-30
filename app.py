@@ -1,9 +1,8 @@
-import streamlit as st 
+import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import shap
-import matplotlib.pyplot as plt
 
 # Load model and feature order
 model = joblib.load("model.pkl")
@@ -128,22 +127,24 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SHAP Explanations ---
-       # --- SHAP Explanations ---
+    # --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # For binary classification, shap_values is a list [class0, class1]
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1 (High Risk), shape: (n_features,)
+            shap_array = shap_values[1][0]  # binary classification: class 1
         else:
-            shap_array = shap_values[0]     # Single array case
+            shap_array = shap_values[0]
+
+        # Ensure it's 1D
+        if shap_array.ndim > 1:
+            shap_array = shap_array.ravel()
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-        # Build HTML explanation
+        # Build explanation HTML
         shap_card = """
         <div class="card">
             <h4>📋 Top Factors Influencing This Prediction:</h4>
