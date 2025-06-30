@@ -137,25 +137,29 @@ if submit:
 
         if isinstance(shap_values, list) and len(shap_values) == 2:
             shap_array = shap_values[1][0]
-        else:
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
             shap_array = shap_values[0]
-
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
-
-        if not shap_series.empty:
-            st.markdown("""
-            <div class="card">
-                <h4>📋 Top Factors Increasing Risk:</h4>
-                <ul style='padding-left: 1.2em;'>
-            """, unsafe_allow_html=True)
-
-            for feature, value in shap_series.head(5).items():
-                st.markdown(f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>", unsafe_allow_html=True)
-
-            st.markdown("</ul></div>", unsafe_allow_html=True)
         else:
-            st.info("No strong features increasing the risk were found.")
+            shap_array = None
+
+        if shap_array is not None and len(shap_array) == len(input_df.columns):
+            shap_series = pd.Series(shap_array, index=input_df.columns)
+            shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
+
+            if not shap_series.empty:
+                shap_card = """
+                <div class="card">
+                    <h4>📋 Top Factors Increasing Risk:</h4>
+                """
+                factors_html = "<ul style='padding-left: 1.2em;'>"
+                for feature, value in shap_series.head(5).items():
+                    factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
+                factors_html += "</ul></div>"
+                st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+            else:
+                st.info("No strong features increasing the risk were found.")
+        else:
+            st.warning("Could not explain this prediction due to unexpected SHAP output shape.")
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
