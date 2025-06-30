@@ -132,19 +132,22 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
+        # Handle binary classification SHAP output
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # binary classification: class 1
+            shap_array = shap_values[1][0]  # class 1, sample 0
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][:, 1]  # shape: (1, features, classes)
         else:
             shap_array = shap_values[0]
 
-        # Ensure it's 1D
-        if shap_array.ndim > 1:
-            shap_array = shap_array.ravel()
+        # Ensure correct shape for Series
+        shap_array = np.array(shap_array).flatten()
+        if shap_array.shape[0] != input_df.shape[1]:
+            raise ValueError(f"SHAP value shape {shap_array.shape} doesn't match input shape {input_df.shape[1]}")
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series.sort_values(key=np.abs, ascending=False)
 
-        # Build explanation HTML
         shap_card = """
         <div class="card">
             <h4>📋 Top Factors Influencing This Prediction:</h4>
