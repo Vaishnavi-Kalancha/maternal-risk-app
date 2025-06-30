@@ -79,7 +79,7 @@ with st.form("risk_form"):
 
 # --- Prediction Logic ---
 if submit:
-    input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
+    input_df = pd.DataFrame([[0] * len(feature_order)], columns=feature_order)
     input_df.at[0, 'Age'] = age
     input_df.at[0, 'Weight'] = weight
     input_df.at[0, 'Height'] = height
@@ -131,28 +131,39 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
+        # Handle multiple SHAP formats
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1
-        elif isinstance(shap_values, np.ndarray) and shap_values.shape[1] == 2:
-            shap_array = shap_values[0][:, 1]
+            shap_array = shap_values[1][0]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0, :, 1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2 and shap_values.shape[1] == 2:
+            shap_array = shap_values[:, 1]
         else:
             shap_array = shap_values[0]
 
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
+        # Ensure it's 1D
+        if shap_array.ndim == 2:
+            shap_array = shap_array[:, 1]
 
-        if shap_series.empty:
-            st.info("This prediction was mostly influenced by neutral or low-impact features.")
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        positive_impact = shap_series[shap_series > 0].sort_values(ascending=False)
+
+        if positive_impact.empty:
+            st.markdown("""
+            <div class="card">
+                <h4>📋 Top Factors Influencing This Prediction:</h4>
+                <p>No strong risk-increasing factors were found.</p>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             shap_card = """
             <div class="card">
                 <h4>📋 Top Factors Increasing Risk:</h4>
             """
             factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in shap_series.head(5).items():
+            for feature, value in positive_impact.head(5).items():
                 factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
             factors_html += "</ul></div>"
-
             st.markdown(shap_card + factors_html, unsafe_allow_html=True)
 
     except Exception as e:
