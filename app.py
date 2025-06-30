@@ -14,7 +14,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -87,45 +86,32 @@ if submit:
     input_df.at[0, 'GestationalAge'] = gest_age
     input_df.at[0, 'FetalHeartbeat'] = fhr
 
-    def set_feature(col_name):
-        if col_name in input_df.columns:
-            input_df.at[0, col_name] = 1
+    # Reset one-hot groups properly
+    def set_one_hot(group_prefix, selected_value):
+        for col in feature_order:
+            if col.startswith(group_prefix + "_"):
+                input_df.at[0, col] = 1 if col == f"{group_prefix}_{selected_value}" else 0
 
-    # One-hot field resets
-    for dose in ["1st", "2nd", "3rd"]:
-        set_feature(f"TetanusDose_{dose}")  # Reset all, overwrite below
-        input_df.at[0, f"TetanusDose_{dose}"] = 0
-    set_feature(f'TetanusDose_{tetanus}')
-
-    for g in ["1st", "2nd", "3rd"]:
-        set_feature(f"Gravida_{g}")
-        input_df.at[0, f"Gravida_{g}"] = 0
-    set_feature(f'Gravida_{gravida}')
-
-    for b in [
-        "100/60", "100/65", "100/70", "110/55", "110/60",
-        "110/65", "110/80", "120/60", "80/60", "90/60"
-    ]:
-        set_feature(f"BloodPressure_{b}")
-        input_df.at[0, f"BloodPressure_{b}"] = 0
-    set_feature(f'BloodPressure_{bp}')
-
+    set_one_hot("Gravida", gravida)
+    set_one_hot("TetanusDose", tetanus)
+    set_one_hot("BloodPressure", bp)
     if urine_albumin != "None":
-        for ua in ["Minimal", "Medium"]:
-            input_df.at[0, f"UrineAlbumin_{ua}"] = 0
-        set_feature(f'UrineAlbumin_{urine_albumin}')
+        set_one_hot("UrineAlbumin", urine_albumin)
 
-    # Binary indicators
-    for cond, name in [
-        (anemia_min, 'Anemia_Minimal'),
-        (urine_sugar, 'UrineSugar_Yes'),
-        (jaundice_min, 'Jaundice_Minimal'),
-        (hepatitis_b, 'HepatitisB_Positive'),
-        (vdrl_pos, 'VDRL_Positive'),
-        (fetal_pos_normal, 'FetalPosition_Normal')
-    ]:
-        if cond: set_feature(name)
+    # Binary features
+    binary_features = {
+        "Anemia_Minimal": anemia_min,
+        "UrineSugar_Yes": urine_sugar,
+        "Jaundice_Minimal": jaundice_min,
+        "HepatitisB_Positive": hepatitis_b,
+        "VDRL_Positive": vdrl_pos,
+        "FetalPosition_Normal": fetal_pos_normal
+    }
+    for feature, is_selected in binary_features.items():
+        if feature in input_df.columns:
+            input_df.at[0, feature] = int(is_selected)
 
+    # Prediction
     prediction = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
@@ -146,38 +132,38 @@ if submit:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- SHAP Explanation ---
+    # SHAP explanation
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Binary classification → shap_values is a list of arrays
+        # Binary classification handling
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
+            shap_array = shap_values[1][0]  # Class 1, sample 0
+        elif isinstance(shap_values, np.ndarray):
+            shap_array = shap_values[0]     # Already single class case
         else:
-            shap_array = shap_values[0]
+            shap_array = shap_values[0]     # Fallback
 
-        # Ensure 1D
-        if shap_array.ndim == 2:
-            shap_array = shap_array[:, 1]  # Shape (features, 2)
-
+        # Convert to Series
         shap_series = pd.Series(shap_array, index=input_df.columns)
         shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
 
-        shap_card = """
+        if shap_series.empty:
+            explanation_html = "<p>No features strongly increased the risk.</p>"
+        else:
+            explanation_html = "<ul style='padding-left: 1.2em;'>"
+            for feature, value in shap_series.head(5).items():
+                emoji = "🔺"
+                explanation_html += f"<li>{emoji} <strong>{feature}</strong> — increased the risk</li>"
+            explanation_html += "</ul>"
+
+        st.markdown(f"""
         <div class="card">
             <h4>📋 Top Factors Increasing Risk:</h4>
-        """
-        if shap_series.empty:
-            shap_card += "<p>No major contributors identified for this prediction.</p></div>"
-        else:
-            factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in shap_series.head(5).items():
-                factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-            factors_html += "</ul></div>"
-            shap_card += factors_html
-
-        st.markdown(shap_card, unsafe_allow_html=True)
+            {explanation_html}
+        </div>
+        """, unsafe_allow_html=True)
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
