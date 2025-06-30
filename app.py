@@ -132,21 +132,21 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Fix for deprecated np.bool (in older SHAP versions)
+        # Fix for deprecated np.bool (older SHAP versions)
         np.bool = bool
 
-        if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # Class 1 explanation for single sample
+        if isinstance(shap_values, list):
+            shap_array = shap_values[1][0]
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
             shap_array = shap_values[0]
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][0, :, 1]
+            shap_array = shap_values[0, :, 1]
         else:
-            raise ValueError("Unexpected SHAP value structure")
+            raise ValueError("Unexpected SHAP shape")
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
 
-        # Filter for positive SHAP values of active features only
+        # Show only risk-increasing features that were active
         active_cols = input_df.columns[input_df.iloc[0] != 0]
         pos_contrib = shap_series[active_cols][shap_series[active_cols] > 0]
         sorted_shap = pos_contrib.sort_values(ascending=False)
