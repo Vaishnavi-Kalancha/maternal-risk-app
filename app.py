@@ -14,7 +14,6 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
-
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -132,37 +131,30 @@ if submit:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Fix for deprecated np.bool (older SHAP versions)
-        np.bool = bool
-
-        if isinstance(shap_values, list):
+        # Binary classification
+        if isinstance(shap_values, list) and len(shap_values) == 2:
             shap_array = shap_values[1][0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
-            shap_array = shap_values[0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0, :, 1]
         else:
-            raise ValueError("Unexpected SHAP shape")
+            shap_array = shap_values[0]
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_positive = shap_series[shap_series > 0].sort_values(ascending=False)
 
-        # Show only risk-increasing features that were active
-        active_cols = input_df.columns[input_df.iloc[0] != 0]
-        pos_contrib = shap_series[active_cols][shap_series[active_cols] > 0]
-        sorted_shap = pos_contrib.sort_values(ascending=False)
+        shap_card = """
+        <div class="card">
+            <h4>📋 Top Factors Influencing This Prediction:</h4>
+        """
 
-        if not sorted_shap.empty:
-            shap_card = """
-            <div class="card">
-                <h4>📋 Top Factors Increasing This Risk:</h4>
-            """
+        if not shap_positive.empty:
             factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in sorted_shap.head(5).items():
+            for feature, value in shap_positive.head(5).items():
                 factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-            factors_html += "</ul></div>"
-            st.markdown(shap_card + factors_html, unsafe_allow_html=True)
+            factors_html += "</ul>"
         else:
-            st.info("No significant risk-increasing factors detected.")
+            factors_html = "<p>✅ None of the features significantly increased the risk.</p>"
+
+        factors_html += "</div>"
+        st.markdown(shap_card + factors_html, unsafe_allow_html=True)
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
