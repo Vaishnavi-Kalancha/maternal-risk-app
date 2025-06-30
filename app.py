@@ -14,6 +14,7 @@ st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
     background: #f6f8fc;
@@ -47,6 +48,7 @@ input, select, textarea { border-radius: 6px !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# --- Header ---
 st.title("🤰 Maternal Health Risk Predictor")
 
 # --- Form Layout ---
@@ -126,41 +128,41 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanation ---
-# --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # ✅ Fix for SHAP shape (binary classification case)
+        # Fix for deprecated np.bool (in older SHAP versions)
+        np.bool = bool
+
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # class 1, sample 0
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][0, :, 1]  # shape: (1, features, 2) → class 1
+            shap_array = shap_values[1][0]  # Class 1 explanation for single sample
         elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
-            shap_array = shap_values[0]  # already correct
+            shap_array = shap_values[0]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][0, :, 1]
         else:
-            raise ValueError("Unexpected SHAP shape")
+            raise ValueError("Unexpected SHAP value structure")
 
         shap_series = pd.Series(shap_array, index=input_df.columns)
 
-        # ✅ Only show features that are non-zero AND increased risk
-        active_features = input_df.columns[input_df.iloc[0] != 0]
-        positive_shap = shap_series[active_features][shap_series[active_features] > 0]
-        sorted_positive = positive_shap.sort_values(ascending=False)
+        # Filter for positive SHAP values of active features only
+        active_cols = input_df.columns[input_df.iloc[0] != 0]
+        pos_contrib = shap_series[active_cols][shap_series[active_cols] > 0]
+        sorted_shap = pos_contrib.sort_values(ascending=False)
 
-        if not sorted_positive.empty:
+        if not sorted_shap.empty:
             shap_card = """
             <div class="card">
                 <h4>📋 Top Factors Increasing This Risk:</h4>
             """
             factors_html = "<ul style='padding-left: 1.2em;'>"
-            for feature, value in sorted_positive.head(5).items():
+            for feature, value in sorted_shap.head(5).items():
                 factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
             factors_html += "</ul></div>"
-
             st.markdown(shap_card + factors_html, unsafe_allow_html=True)
         else:
-            st.info("No strong contributing factors detected for increased risk.")
+            st.info("No significant risk-increasing factors detected.")
 
     except Exception as e:
         st.warning("Could not explain this prediction.")
