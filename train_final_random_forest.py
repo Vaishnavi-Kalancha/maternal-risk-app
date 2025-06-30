@@ -11,61 +11,63 @@ from sklearn.metrics import classification_report, accuracy_score, f1_score, roc
 from imblearn.over_sampling import SMOTE
 
 # === Load dataset ===
-df = pd.read_excel("Book2 (1).xlsx", sheet_name="Sheet1")
-df.columns = df.iloc[0]
-df = df[1:].reset_index(drop=True)
-df.columns.name = None
+df = pd.read_excel("Book2 (2).xlsx", sheet_name="Sheet1", header=1)
 
-# === Rename columns ===
+# Show original column names to debug
+print("Excel column headers:", df.columns.tolist())
+
+# === Rename Bengali columns to English ===
 df.rename(columns={
-    'ANCC REGISTER': 'Name',
-    'Unnamed: 1': 'Age',
-    'Unnamed: 2': 'Gravida',
-    'Unnamed: 3': 'TetanusDose',
-    'Unnamed: 4': 'GestationalAge',
-    'Unnamed: 5': 'Weight',
-    'Unnamed: 6': 'Height',
-    'Unnamed: 7': 'BloodPressure',
-    'Unnamed: 8': 'Anemia',
-    'Unnamed: 9': 'Jaundice',
-    'Unnamed: 10': 'FetalPosition',
-    'Unnamed: 11': 'FetalMovement',
-    'Unnamed: 12': 'FetalHeartbeat',
-    'Unnamed: 13': 'UrineAlbumin',
-    'Unnamed: 14': 'UrineSugar',
-    'Unnamed: 15': 'VDRL',
-    'Unnamed: 16': 'HepatitisB',
-    'Unnamed: 17': 'HighRisk'
+    'Name': 'Name',
+    'Age': 'Age',
+    'Gravida': 'Gravida',
+    'TiTi Tika': 'TetanusDose',
+    'গর্ভকাল': 'GestationalAge',
+    'ওজন': 'Weight',
+    'উচ্চতা': 'Height',
+    'রক্ত চাপ': 'BloodPressure',
+    'রক্তস্বল্পতা': 'Anemia',
+    'জন্ডিস': 'Jaundice',
+    'গর্ভস্হ শিশু অবস্থান': 'FetalPosition',
+    'গর্ভস্হ শিশু নাড়াচাড়া': 'FetalMovement',
+    'গর্ভস্হ শিশু হৃৎস্পন্দন': 'FetalHeartbeat',
+    'প্রসাব পরিক্ষা এলবুমিন': 'UrineAlbumin',
+    'প্রসাব পরিক্ষা সুগার': 'UrineSugar',
+    'VDRL': 'VDRL',
+    'HRsAG': 'HepatitisB',
+    'ঝুকিপূর্ণ গর্ভ': 'HighRisk'
 }, inplace=True)
 
 # === Clean and convert columns ===
 df['Age'] = pd.to_numeric(df['Age'], errors='coerce')
-df['Weight'] = df['Weight'].str.replace(' kg', '', regex=False).astype(float)
-df['Height'] = df['Height'].str.replace("''", '', regex=False).astype(float)
-df['GestationalAge'] = df['GestationalAge'].str.extract(r'(\d+)').astype(float)
-df['FetalHeartbeat'] = df['FetalHeartbeat'].str.replace('m', '', regex=False).astype(float)
+df['Weight'] = df['Weight'].astype(str).str.replace(' kg', '', regex=False).astype(float)
+df['Height'] = df['Height'].astype(str).str.replace("''", '', regex=False).astype(float)
+df['GestationalAge'] = df['GestationalAge'].astype(str).str.extract(r'(\d+)').astype(float)
+df['FetalHeartbeat'] = df['FetalHeartbeat'].astype(str).str.replace('m', '', regex=False).astype(float)
 df['HighRisk'] = df['HighRisk'].map({'Yes': 1, 'No': 0})
 
 # Drop unusable and NaNs
 df = df.drop(columns=['Name'], errors='ignore')
 df = df.dropna(subset=['HighRisk'])
 
-# One-hot encode all relevant columns
+# === One-hot encode categorical columns ===
 df = pd.get_dummies(df, columns=[
     'Gravida', 'TetanusDose', 'BloodPressure', 'Anemia', 'Jaundice',
     'FetalPosition', 'FetalMovement', 'UrineAlbumin', 'UrineSugar',
     'VDRL', 'HepatitisB'
-], drop_first=False)  # Keep all to prevent mismatch
+], drop_first=False)
 
-# Drop rows with remaining NaNs
+# Final cleanup
 df = df.dropna()
 
-# === Train/Test Split ===
+# === Split features and target ===
 X = df.drop(columns=['HighRisk'])
 y = df['HighRisk']
+
+# === Train/Test Split ===
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
 
-# === Balance classes ===
+# === Balance classes with SMOTE ===
 smote = SMOTE(random_state=42)
 X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
 
@@ -76,6 +78,7 @@ model.fit(X_train_bal, y_train_bal)
 # === Evaluation ===
 y_pred = model.predict(X_test)
 y_proba = model.predict_proba(X_test)[:, 1]
+
 print(classification_report(y_test, y_pred))
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("F1 Score:", f1_score(y_test, y_pred))
@@ -88,7 +91,7 @@ print("✅ Model and feature order saved.")
 
 # === SHAP Summary Plot ===
 import numpy as np
-np.bool = bool  # Quick fix for deprecated np.bool usage in SHAP
+np.bool = bool  # Patch deprecated type for SHAP
 
 explainer = shap.TreeExplainer(model)
 shap_values = explainer.shap_values(X_test)
@@ -123,3 +126,5 @@ plt.savefig("roc_curve.png", dpi=300)
 plt.close()
 
 print("✅ All plots and model files generated.")
+print("Training samples after SMOTE:", X_train_bal.shape[0])
+print("Class distribution after SMOTE:\n", y_train_bal.value_counts())
