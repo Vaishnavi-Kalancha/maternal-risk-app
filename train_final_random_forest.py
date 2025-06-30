@@ -1,22 +1,22 @@
+# === train_final_random_forest.py ===
 import pandas as pd
 import numpy as np
 import joblib
 import shap
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score, f1_score, roc_auc_score, confusion_matrix, roc_curve, auc
 from imblearn.over_sampling import SMOTE
 
-# === Load dataset and clean headers ===
-df = pd.read_excel("Book2 (2).xlsx", sheet_name="Sheet1", header=1)  # Assuming second row has column names
+# Fix deprecated np.bool usage
+np.bool = bool
 
-# Print to confirm column names
-print("✅ Cleaned Excel headers:", df.columns.tolist())
+# Load and preprocess dataset
+df = pd.read_excel("Book2 (2).xlsx", sheet_name="Sheet1", header=1)
 
-# === Rename Bengali columns to English ===
+# Rename Bengali to English
 df.rename(columns={
     'Name': 'Name',
     'Age': 'Age',
@@ -38,10 +38,10 @@ df.rename(columns={
     'ঝুকিপূর্ণ গর্ভ': 'HighRisk'
 }, inplace=True)
 
-# === Drop name column ===
-df = df.drop(columns=['Name'], errors='ignore')
+# Drop Name column
+df.drop(columns=['Name'], inplace=True, errors='ignore')
 
-# === Clean numeric columns ===
+# Clean and convert numeric fields
 df['Age'] = pd.to_numeric(df['Age'], errors='coerce')
 df['Weight'] = df['Weight'].astype(str).str.replace(' kg', '', regex=False).astype(float)
 df['Height'] = df['Height'].astype(str).str.replace("''", '', regex=False).astype(float)
@@ -49,83 +49,60 @@ df['GestationalAge'] = df['GestationalAge'].astype(str).str.extract(r'(\d+)').as
 df['FetalHeartbeat'] = df['FetalHeartbeat'].astype(str).str.replace('m', '', regex=False).astype(float)
 df['HighRisk'] = df['HighRisk'].map({'Yes': 1, 'No': 0})
 
-# === Drop rows with missing target or important features ===
-df = df.dropna(subset=['HighRisk'])
+# Drop rows with missing target
+df.dropna(subset=['HighRisk'], inplace=True)
 
-# === One-hot encode categorical features ===
-df = pd.get_dummies(df, columns=[
-    'Gravida', 'TetanusDose', 'BloodPressure', 'Anemia', 'Jaundice',
-    'FetalPosition', 'FetalMovement', 'UrineAlbumin', 'UrineSugar',
-    'VDRL', 'HepatitisB'
-], drop_first=False)
+# Define all expected categories for one-hot features
+cat_features = {
+    'Gravida': ['1st', '2nd', '3rd'],
+    'TetanusDose': ['2nd', '3rd'],
+    'BloodPressure': ["100/60", "100/65", "100/70", "110/55", "110/60", "110/65", "110/80", "120/60", "80/60", "90/60"],
+    'Anemia': ['Minimal'],
+    'Jaundice': ['Minimal'],
+    'FetalPosition': ['Normal'],
+    'FetalMovement': ['Normal'],
+    'UrineAlbumin': ['Minimal', 'Medium'],
+    'UrineSugar': ['Yes'],
+    'VDRL': ['Positive'],
+    'HepatitisB': ['Positive', 'Negative']
+}
 
-# === Drop any remaining rows with missing values ===
-df = df.dropna()
+# Apply one-hot encoding with expected categories
+df = pd.get_dummies(df, columns=cat_features.keys())
 
-# === Train/Test Split ===
+# Ensure all possible one-hot columns exist
+template = pd.DataFrame(columns=[])
+for feature, values in cat_features.items():
+    for val in values:
+        col = f"{feature}_{val}"
+        if col not in df.columns:
+            df[col] = 0
+
+# Drop rows with missing values
+df.dropna(inplace=True)
+
+# Train/Test Split
 X = df.drop(columns=['HighRisk'])
 y = df['HighRisk']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
 
-# === Balance classes using SMOTE ===
+# SMOTE
 smote = SMOTE(random_state=42)
 X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
 
-# === Train Random Forest ===
+# Train model
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train_bal, y_train_bal)
 
-# === Evaluation ===
+# Evaluate
 y_pred = model.predict(X_test)
 y_proba = model.predict_proba(X_test)[:, 1]
-
 print(classification_report(y_test, y_pred))
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("F1 Score:", f1_score(y_test, y_pred))
 print("ROC AUC:", roc_auc_score(y_test, y_proba))
 
-# === Save model and features ===
+# Save model
 joblib.dump(model, "model.pkl")
 joblib.dump(X.columns.tolist(), "feature_order.pkl")
-print("✅ Model and feature order saved.")
-
-# === Fix for deprecated np.bool ===
-np.bool = bool
-
-# === SHAP Summary Plot ===
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(X_test)
-
-shap.summary_plot(shap_values[1], X_test, plot_type="bar", show=False)
-plt.tight_layout()
-plt.savefig("shap_summary_bar.png", dpi=300)
-plt.close()
-
-# === Confusion Matrix ===
-cm = confusion_matrix(y_test, y_pred)
-plt.figure(figsize=(5, 4))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=["No Risk", "High Risk"], yticklabels=["No Risk", "High Risk"])
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.title("Confusion Matrix")
-plt.tight_layout()
-plt.savefig("confusion_matrix.png", dpi=300)
-plt.close()
-
-# === ROC Curve ===
-fpr, tpr, thresholds = roc_curve(y_test, y_proba)
-roc_auc = auc(fpr, tpr)
-plt.figure(figsize=(6, 5))
-plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}", color="darkorange")
-plt.plot([0, 1], [0, 1], linestyle="--", color="navy")
-plt.xlabel("False Positive Rate")
-plt.ylabel("True Positive Rate")
-plt.title("ROC Curve")
-plt.legend()
-plt.tight_layout()
-plt.savefig("roc_curve.png", dpi=300)
-plt.close()
-
-print("✅ All plots and model files generated.")
-print("Training samples after SMOTE:", X_train_bal.shape[0])
-print("Class distribution after SMOTE:\n", y_train_bal.value_counts())
+print("\n✅ Model and feature order saved.")

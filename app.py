@@ -1,14 +1,13 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import numpy as np
 import joblib
-import shap
 
-# Load model and feature order
+# Load trained model and expected feature order
 model = joblib.load("model.pkl")
 feature_order = joblib.load("feature_order.pkl")
 
-st.set_page_config(page_title="Maternal Risk Predictor", layout="centered")
+st.set_page_config(page_title="Maternal Health Risk Predictor", layout="centered")
 
 # --- CSS Styling ---
 st.markdown("""
@@ -19,7 +18,7 @@ html, body, [class*="css"] {
     background: #f6f8fc;
     color: #2d3436;
 }
-h1 { text-align: center; color: #c0392b; margin-bottom: 0.5em; }
+h1 { text-align: center; color: #2c3e50; margin-bottom: 0.5em; }
 input, select, textarea { border-radius: 6px !important; }
 .stButton>button {
     background-color: #6c5ce7; color: white;
@@ -47,10 +46,8 @@ input, select, textarea { border-radius: 6px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Title ---
 st.title("🤰 Maternal Health Risk Predictor")
 
-# --- Form Input ---
 with st.form("risk_form"):
     col1, col2 = st.columns(2)
     with col1:
@@ -67,17 +64,17 @@ with st.form("risk_form"):
     with col2:
         fhr = st.slider("Fetal Heart Rate (bpm)", 100, 180, 140)
         gravida = st.selectbox("Gravida", ["1st", "2nd", "3rd"])
-        tetanus = st.selectbox("Tetanus Dose", ["1st", "2nd", "3rd"])
+        tetanus = st.selectbox("Tetanus Dose", ["2nd", "3rd"])  # model-supported only
         anemia_min = st.checkbox("Anemia Minimal")
         urine_sugar = st.checkbox("Urine Sugar Present")
         jaundice_min = st.checkbox("Jaundice Minimal")
-        hepatitis_b = st.checkbox("Hepatitis B Positive")
+        hepatitis_b = st.selectbox("Hepatitis B", ["Positive", "Negative"])
         vdrl_pos = st.checkbox("VDRL Positive")
         fetal_pos_normal = st.checkbox("Fetal Position Normal")
 
     submit = st.form_submit_button("Predict Risk")
 
-# --- Prediction ---
+# --- Prediction Logic ---
 if submit:
     input_df = pd.DataFrame([[0]*len(feature_order)], columns=feature_order)
     input_df.at[0, 'Age'] = age
@@ -90,33 +87,46 @@ if submit:
         if col_name in input_df.columns:
             input_df.at[0, col_name] = 1
 
-    # Set binary features
-    for cond, name in [
-        (anemia_min, 'Anemia_Minimal'),
-        (urine_sugar, 'UrineSugar_Yes'),
-        (jaundice_min, 'Jaundice_Minimal'),
-        (hepatitis_b, 'HepatitisB_Positive'),
-        (vdrl_pos, 'VDRL_Positive'),
-        (fetal_pos_normal, 'FetalPosition_Normal')
-    ]:
-        if cond:
-            set_feature(name)
-
-    # Set one-hot features
     set_feature(f'Gravida_{gravida}')
+
+    # Ensure mutually exclusive TetanusDose values
+    for td in ['2nd', '3rd']:
+        col = f'TetanusDose_{td}'
+        if col in input_df.columns:
+            input_df.at[0, col] = 0
     set_feature(f'TetanusDose_{tetanus}')
+
     set_feature(f'BloodPressure_{bp}')
     if urine_albumin != "None":
         set_feature(f'UrineAlbumin_{urine_albumin}')
+    if anemia_min:
+        set_feature('Anemia_Minimal')
+    if urine_sugar:
+        set_feature('UrineSugar_Yes')
+    if jaundice_min:
+        set_feature('Jaundice_Minimal')
+    if hepatitis_b == "Positive":
+        set_feature('HepatitisB_Positive')
+    else:
+        set_feature('HepatitisB_Negative')
+    if vdrl_pos:
+        set_feature('VDRL_Positive')
+    if fetal_pos_normal:
+        set_feature('FetalPosition_Normal')
 
-    prediction = model.predict(input_df)[0]
+    # Debug print: see which one-hot features are turned on
+    print("Activated Features:", input_df.loc[:, input_df.values[0] == 1].columns.tolist())
+
+    # Prediction
     prob = model.predict_proba(input_df)[0][1]
+    prediction = model.predict(input_df)[0]
 
-    if prob < 0.3:
+    # Risk classification
+    if prob < 0.4:
         label = "✅ Low Risk"
         style = "risk-low"
         comment = "No major risk indicators detected."
-    elif prob < 0.7:
+    elif prob < 0.75:
         label = "⚠️ Moderate Risk"
         style = "risk-moderate"
         comment = "Some concerning factors detected. Closer monitoring recommended."
@@ -125,6 +135,7 @@ if submit:
         style = "risk-high"
         comment = "Immediate clinical attention may be required."
 
+    # Output
     st.markdown(f"""
     <div class="card">
         <div class="{style} result-label">{label}</div>
@@ -132,39 +143,3 @@ if submit:
         <div><em>{comment}</em></div>
     </div>
     """, unsafe_allow_html=True)
-
-    # --- SHAP Explainability ---
-    try:
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(input_df)
-
-        if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
-            shap_array = shap_values[0]
-        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-            shap_array = shap_values[0][0]
-        else:
-            raise ValueError("Unexpected SHAP output shape.")
-
-        if shap_array.shape[0] != input_df.shape[1]:
-            raise ValueError("SHAP shape mismatch")
-
-        shap_series = pd.Series(shap_array, index=input_df.columns)
-        shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
-
-        if not shap_series.empty:
-            shap_card = """
-            <div class="card">
-                <h4>📋 Top Factors Increasing Risk:</h4>
-                <ul style='padding-left: 1.2em;'>
-            """
-            for feature, value in shap_series.head(5).items():
-                shap_card += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-            shap_card += "</ul></div>"
-
-            st.markdown(shap_card, unsafe_allow_html=True)
-        else:
-            st.info("No strong features increasing the risk were found.")
-    except Exception:
-        st.warning("Could not explain this prediction.")
