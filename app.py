@@ -131,37 +131,38 @@ if submit:
     """, unsafe_allow_html=True)
 
     # --- SHAP Explanation ---
+        # --- SHAP Explanation ---
     try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_df)
 
-        # Get SHAP values based on format
+        # Robustly flatten shap_values
         if isinstance(shap_values, list) and len(shap_values) == 2:
-            shap_array = shap_values[1][0]  # For class 1 (high risk)
-        elif isinstance(shap_values, np.ndarray):
+            shap_array = shap_values[1][0]  # Class 1 SHAP for sample 0
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 2:
             shap_array = shap_values[0]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_array = shap_values[0][0]  # Try to flatten (1, features, 2)
         else:
-            shap_array = None
+            raise ValueError("Unexpected SHAP output shape.")
 
-        # Validate length before Series creation
-        if shap_array is not None and len(shap_array) == len(input_df.columns):
-            shap_series = pd.Series(shap_array, index=input_df.columns)
-            shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
+        if shap_array.shape[0] != input_df.shape[1]:
+            raise ValueError("SHAP output shape mismatch.")
 
-            if not shap_series.empty:
-                shap_card = """
-                <div class="card">
-                    <h4>📋 Top Factors Increasing Risk:</h4>
-                """
-                factors_html = "<ul style='padding-left: 1.2em;'>"
-                for feature, value in shap_series.head(5).items():
-                    factors_html += f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
-                factors_html += "</ul></div>"
-                st.markdown(shap_card + factors_html, unsafe_allow_html=True)
-            else:
-                st.info("No strong features increasing the risk were found.")
+        shap_series = pd.Series(shap_array, index=input_df.columns)
+        shap_series = shap_series[shap_series > 0].sort_values(ascending=False)
+
+        if not shap_series.empty:
+            st.markdown(
+                "<div class='card'><h4>📋 Top Factors Increasing Risk:</h4><ul style='padding-left: 1.2em;'>"
+                + "".join(
+                    f"<li>🔺 <strong>{feature}</strong> — increased the risk</li>"
+                    for feature in shap_series.head(5).index
+                )
+                + "</ul></div>",
+                unsafe_allow_html=True
+            )
         else:
-            st.warning("Could not explain this prediction due to unexpected SHAP output shape.")
-
+            st.info("No strong features increasing the risk were found.")
     except Exception as e:
         st.warning("Could not explain this prediction.")
