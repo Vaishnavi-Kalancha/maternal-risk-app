@@ -34,7 +34,6 @@ input, select, textarea { border-radius: 6px !important; }
 }
 .result-label { font-size: 1.4em; margin-bottom: 0.5em; }
 .risk-high { color: #c0392b; font-weight: bold; }
-.risk-moderate { color: #d35400; font-weight: bold; }
 .risk-low { color: #27ae60; font-weight: bold; }
 .card hr {
     margin: 1em 0;
@@ -64,7 +63,7 @@ with st.form("risk_form"):
     with col2:
         fhr = st.slider("Fetal Heart Rate (bpm)", 100, 180, 140)
         gravida = st.selectbox("Gravida", ["1st", "2nd", "3rd"])
-        tetanus = st.selectbox("Tetanus Dose", ["2nd", "3rd"])  # model-supported only
+        tetanus = st.selectbox("Tetanus Dose", ["2nd", "3rd"])
         anemia_min = st.checkbox("Anemia Minimal")
         urine_sugar = st.checkbox("Urine Sugar Present")
         jaundice_min = st.checkbox("Jaundice Minimal")
@@ -89,7 +88,6 @@ if submit:
 
     set_feature(f'Gravida_{gravida}')
 
-    # Ensure mutually exclusive TetanusDose values
     for td in ['2nd', '3rd']:
         col = f'TetanusDose_{td}'
         if col in input_df.columns:
@@ -114,32 +112,21 @@ if submit:
     if fetal_pos_normal:
         set_feature('FetalPosition_Normal')
 
-    # Debug print: see which one-hot features are turned on
-    print("Activated Features:", input_df.loc[:, input_df.values[0] == 1].columns.tolist())
-
-    # Prediction
-    prob = model.predict_proba(input_df)[0][1]
+    # Predict
     prediction = model.predict(input_df)[0]
 
-    # Risk classification
-    if prob < 0.4:
-        label = "✅ Low Risk"
-        style = "risk-low"
-        comment = "No major risk indicators detected."
-    elif prob < 0.75:
-        label = "⚠️ Moderate Risk"
-        style = "risk-moderate"
-        comment = "Some concerning factors detected. Closer monitoring recommended."
+    # Show result
+    if prediction == 1:
+        st.markdown(f"""
+        <div class="card">
+            <div class="risk-high result-label">🛑 High Risk</div>
+            <div>This pregnancy is at high risk and needs urgent clinical attention.</div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        label = "🛑 High Risk"
-        style = "risk-high"
-        comment = "Immediate clinical attention may be required."
-
-    # Output
-    st.markdown(f"""
-    <div class="card">
-        <div class="{style} result-label">{label}</div>
-        <div><strong>Probability of High Risk:</strong> {prob:.2%}</div>
-        <div><em>{comment}</em></div>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="card">
+            <div class="risk-low result-label">✅ Low Risk</div>
+            <div>No significant risk factors detected in this pregnancy.</div>
+        </div>
+        """, unsafe_allow_html=True)

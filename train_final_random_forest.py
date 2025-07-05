@@ -1,17 +1,20 @@
-# === train_final_random_forest.py ===
 import pandas as pd
 import numpy as np
 import joblib
-import shap
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
+
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, accuracy_score, f1_score, roc_auc_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import (
+    classification_report,
+    accuracy_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    roc_curve,
+)
 from imblearn.over_sampling import SMOTE
-
-# Fix deprecated np.bool usage
-np.bool = bool
 
 # Load and preprocess dataset
 df = pd.read_excel("Book2 (2).xlsx", sheet_name="Sheet1", header=1)
@@ -71,7 +74,6 @@ cat_features = {
 df = pd.get_dummies(df, columns=cat_features.keys())
 
 # Ensure all possible one-hot columns exist
-template = pd.DataFrame(columns=[])
 for feature, values in cat_features.items():
     for val in values:
         col = f"{feature}_{val}"
@@ -86,23 +88,25 @@ X = df.drop(columns=['HighRisk'])
 y = df['HighRisk']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, stratify=y, random_state=42)
 
-# SMOTE
+# SMOTE to handle class imbalance
 smote = SMOTE(random_state=42)
 X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
 
-# Train model
+# Train Random Forest model
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train_bal, y_train_bal)
 
-# Evaluate
+# Evaluate model
 y_pred = model.predict(X_test)
 y_proba = model.predict_proba(X_test)[:, 1]
-print(classification_report(y_test, y_pred))
+
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("F1 Score:", f1_score(y_test, y_pred))
-print("ROC AUC:", roc_auc_score(y_test, y_proba))
+print("ROC AUC Score:", roc_auc_score(y_test, y_proba))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
 
-# Save model
+# Save model and feature order
 joblib.dump(model, "model.pkl")
 joblib.dump(X.columns.tolist(), "feature_order.pkl")
 print("\n✅ Model and feature order saved.")
