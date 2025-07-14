@@ -1,58 +1,96 @@
-# 🤰 Maternal Health Risk Prediction Web App
 
-This is a machine learning web application that predicts whether a pregnant individual is at **Low**, **Moderate**, or **High Risk** based on clinical data collected during antenatal care. The model is trained using a **Random Forest Classifier**, and the application is built and deployed with **Streamlit**.
+ Maternal Risk Prediction System (ML-MRPS)
+This project is a lightweight, web-based maternal health risk prediction system built using machine learning. It assists frontline health workers in resource-constrained environments to assess whether a pregnancy is High Risk or Low Risk, based on antenatal clinical data.
+Features
+Binary Risk Classification: Low Risk / High Risk
 
-🔗 **Live Demo**: [Click here to try the app](https://maternal-risk-app-fequ2kxspfmfvgkzf67wkk.streamlit.app/)
+Trained with Random Forest (best model after comparison)
 
----
+Class imbalance handled with SMOTE
 
-## 🚀 Features
+Full preprocessing pipeline: cleaning, encoding, standardization
 
-- Predicts maternal risk as **Low**, **Moderate**, or **High**
-- Interactive form to input clinical characteristics
-- Trained on real-world antenatal care data
-- **SHAP explainability** to highlight key contributing factors
-- Clean and responsive UI with custom CSS
-- Fully deployed online with **Streamlit Cloud**
+Deployed via Streamlit (local or cloud)
 
----
+Supports legacy clinical registers from rural health records
 
-## 📷 Screenshot
+Dataset
+The data was collected from antenatal care (ANC) registers in rural Bangladesh. It includes fields like:
 
-*(You can add a screenshot like `shap_summary_bar.png` or the app UI if desired)*
+Age, Weight, Height, Gestational Age
 
----
+Fetal Heartbeat, Fetal Movement
 
-## 🧠 Machine Learning Model
+Anemia, Jaundice
 
-- Algorithm: `RandomForestClassifier`
-- Dataset: Preprocessed and balanced with **SMOTE**
-- Evaluation (70:30 split):
-  - Accuracy: **94.67%**
-  - F1 Score: **95.96%**
-  - ROC AUC: **99.20%**
-- Explainability: Integrated SHAP plots per prediction
+Urine Albumin, Urine Sugar, Tetanus Dose
 
----
+And more...
 
-## 🛠️ Technologies Used
+Technologies Used
+Python
 
-| Tool | Purpose |
-|------|---------|
-| **Python** | Core Programming Language |
-| **scikit-learn** | Machine Learning Algorithms |
-| **SHAP** | Explainable AI |
-| **Pandas, NumPy** | Data Processing |
-| **Streamlit** | Web UI Framework |
-| **Joblib** | Model Serialization |
-| **Git + GitHub** | Version Control & Hosting |
+scikit-learn (ML)
 
----
+pandas / numpy (Data)
 
-## 📦 How to Run Locally
+SMOTE (Imbalance handling)
 
-```bash
-git clone https://github.com/Vaishnavi-Kalancha/maternal-risk-app.git
-cd maternal-risk-app
-pip install -r requirements.txt
+Streamlit (Web App)
+
+Joblib (Model serialization)
+
+Git + GitHub (Version control)
+
+Model Training
+Run the training script:
+
+bash
+Copy
+Edit
+python train_final_random_forest.py
+This will:
+
+Preprocess and balance the dataset
+
+Train a Random Forest model
+
+Save the model and feature order as model.pkl and feature_order.pkl
+
+Launch the Web App
+Run the following to start the app:
+
+bash
+Copy
+Edit
 streamlit run app.py
+Features:
+
+User-friendly clinical input form
+
+Displays Low Risk or High Risk as output
+
+Designed for use by ASHA workers, nurses, or midwives
+
+Repository Structure
+bash
+Copy
+Edit
+├── app.py                      # Streamlit frontend
+├── train_final_random_forest.py # Training script
+├── model.pkl                   # Trained Random Forest model
+├── feature_order.pkl           # Column order for predictions
+├── README.md                   # You're reading it!
+Future Enhancements
+Mobile-first UI for rural health workers
+
+Real-time data entry from IoT or wearables
+
+Alert system for high-risk cases
+
+Regional data expansion to improve generalizability
+
+Author
+Kalancha Vaishnavi
+I M Tech II Semester | 2025
+Dept. of CSE
